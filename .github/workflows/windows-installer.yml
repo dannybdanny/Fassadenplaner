@@ -8,8 +8,33 @@ jobs:
     runs-on: [self-hosted, Windows, X64]
 
     steps:
+      - name: Stop old Fassadenplaner processes
+        shell: powershell
+        run: |
+          Get-Process Fassadenplaner -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Milliseconds 800
+
+          $oldPublish = Join-Path $env:GITHUB_WORKSPACE "publish"
+          if (Test-Path $oldPublish) {
+            Remove-Item $oldPublish -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          clean: false
+
+      - name: Clean old build output
+        shell: powershell
+        run: |
+          Get-Process Fassadenplaner -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Milliseconds 500
+
+          foreach ($path in @("bin", "obj", "publish")) {
+            if (Test-Path $path) {
+              Remove-Item $path -Recurse -Force -ErrorAction Stop
+            }
+          }
 
       - name: Setup local .NET 10 SDK
         shell: powershell
