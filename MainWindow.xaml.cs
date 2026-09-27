@@ -15,24 +15,40 @@ public partial class MainWindow : Window
     private const string GableKey = "gable";
 
     private double _widthMm = 3000;
-    private double _heightMm = 1600;
+    private double _frontWallHeightMm = 1600;
     private double _depthMm = 1800;
     private double _gableHeightMm = 800;
+    private double _roofPitchDeg = 35;
 
     private string _selectedDimension = WidthKey;
+    private string? _pendingDimensionKey;
 
     private readonly Dictionary<string, List<ModelUIElement3D>> _dimensionEdges = new();
 
-    private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(64, 78, 90));
-    private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(23, 119, 173));
+    private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(63, 77, 89));
+    private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(24, 119, 173));
+    private readonly Brush _roofBrush = new SolidColorBrush(Color.FromRgb(161, 173, 183));
+    private readonly Brush _roofGridBrush = new SolidColorBrush(Color.FromRgb(218, 224, 229));
+
+    private Point _mouseDownPosition;
+    private Point _lastMousePosition;
+    private bool _isOrbiting;
+    private bool _isPanning;
+    private bool _leftDragExceededThreshold;
+
+    private double _cameraYawDeg = 38;
+    private double _cameraPitchDeg = 23;
+    private double _cameraDistance = 12.5;
+    private Point3D _cameraTarget = new(0, 1.2, 0);
 
     public MainWindow()
     {
         InitializeComponent();
+
         Loaded += (_, _) =>
         {
             RefreshDimensionSummary();
-            BuildDormer();
+            BuildDormer(resetView: true);
             SelectDimension(WidthKey);
         };
     }
@@ -49,15 +65,14 @@ public partial class MainWindow : Window
         GableValueText.Visibility = HasGable ? Visibility.Visible : Visibility.Collapsed;
 
         if (!HasGable && _selectedDimension == GableKey)
-            SelectDimension(WidthKey);
+            _selectedDimension = WidthKey;
 
-        BuildDormer();
+        BuildDormer(resetView: false);
+        SelectDimension(_selectedDimension);
     }
 
     private void ApplyDimension_Click(object sender, RoutedEventArgs e)
-    {
-        ApplySelectedDimension();
-    }
+        => ApplySelectedDimension();
 
     private void DimensionValueBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -66,6 +81,37 @@ public partial class MainWindow : Window
             ApplySelectedDimension();
             e.Handled = true;
         }
+    }
+
+    private void RoofPitchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        ApplyRoofPitch();
+        e.Handled = true;
+    }
+
+    private void ApplyRoofPitch()
+    {
+        var text = RoofPitchBox.Text.Trim().Replace(',', '.');
+
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch) ||
+            pitch <= 0 || pitch >= 80)
+        {
+            MessageBox.Show("Bitte eine Dachneigung zwischen 0° und 80° eingeben.",
+                "Ungültige Dachneigung",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            RoofPitchBox.Focus();
+            RoofPitchBox.SelectAll();
+            return;
+        }
+
+        _roofPitchDeg = pitch;
+        RefreshDimensionSummary();
+        BuildDormer(resetView: false);
+        SelectDimension(_selectedDimension);
     }
 
     private void ApplySelectedDimension()
@@ -92,7 +138,7 @@ public partial class MainWindow : Window
                 _widthMm = value;
                 break;
             case HeightKey:
-                _heightMm = value;
+                _frontWallHeightMm = value;
                 break;
             case DepthKey:
                 _depthMm = value;
@@ -103,16 +149,18 @@ public partial class MainWindow : Window
         }
 
         RefreshDimensionSummary();
-        BuildDormer();
+        BuildDormer(resetView: false);
         SelectDimension(_selectedDimension);
     }
 
     private void RefreshDimensionSummary()
     {
         WidthValueText.Text = FormatMillimeters(_widthMm);
-        HeightValueText.Text = FormatMillimeters(_heightMm);
+        HeightValueText.Text = FormatMillimeters(_frontWallHeightMm);
         DepthValueText.Text = FormatMillimeters(_depthMm);
         GableValueText.Text = FormatMillimeters(_gableHeightMm);
+        PitchValueText.Text = $"{_roofPitchDeg:0.#}°";
+        RoofPitchBox.Text = _roofPitchDeg.ToString("0.#", CultureInfo.InvariantCulture);
     }
 
     private static string FormatMillimeters(double value)
@@ -130,18 +178,18 @@ public partial class MainWindow : Window
                 DimensionValueBox.Text = _widthMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
             case HeightKey:
-                SelectedDimensionTitle.Text = "Wandhöhe";
-                SelectedDimensionHint.Text = "Senkrechte Kante von Unterkante bis Traufe";
-                DimensionValueBox.Text = _heightMm.ToString("0", CultureInfo.InvariantCulture);
+                SelectedDimensionTitle.Text = "Front-Wandhöhe";
+                SelectedDimensionHint.Text = "Senkrechte Kante der Gaubenfront";
+                DimensionValueBox.Text = _frontWallHeightMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
             case DepthKey:
                 SelectedDimensionTitle.Text = "Gaubentiefe";
-                SelectedDimensionHint.Text = "Seitliche Kante der Gaubenwange";
+                SelectedDimensionHint.Text = "Tiefe der Gaube entlang der Hauptdachfläche";
                 DimensionValueBox.Text = _depthMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
             case GableKey:
                 SelectedDimensionTitle.Text = "Giebelhöhe";
-                SelectedDimensionHint.Text = "Höhe von Traufe bis Giebelspitze";
+                SelectedDimensionHint.Text = "Zusätzliche Höhe von Traufe bis Giebelspitze";
                 DimensionValueBox.Text = _gableHeightMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
         }
@@ -151,7 +199,7 @@ public partial class MainWindow : Window
         DimensionValueBox.SelectAll();
     }
 
-    private void BuildDormer()
+    private void BuildDormer(bool resetView)
     {
         DormerViewport.Children.Clear();
         _dimensionEdges.Clear();
@@ -162,98 +210,248 @@ public partial class MainWindow : Window
         DormerViewport.Children.Add(new ModelVisual3D { Content = lights });
 
         var scale = ComputeScale();
+
         var width = _widthMm * scale;
-        var height = _heightMm * scale;
+        var height = _frontWallHeightMm * scale;
         var depth = _depthMm * scale;
         var gable = _gableHeightMm * scale;
+        var roofRise = Math.Tan(DegToRad(_roofPitchDeg)) * depth;
 
         var x0 = -width / 2.0;
         var x1 = width / 2.0;
         var zFront = depth / 2.0;
         var zBack = -depth / 2.0;
-        const double y0 = 0;
-        var y1 = height;
 
-        var frontBottomLeft = new Point3D(x0, y0, zFront);
-        var frontBottomRight = new Point3D(x1, y0, zFront);
-        var frontTopLeft = new Point3D(x0, y1, zFront);
-        var frontTopRight = new Point3D(x1, y1, zFront);
+        var frontRoofY = 0.0;
+        var backRoofY = roofRise;
+        var eaveY = frontRoofY + height;
 
-        var backBottomLeft = new Point3D(x0, y0, zBack);
-        var backBottomRight = new Point3D(x1, y0, zBack);
-        var backTopLeft = new Point3D(x0, y1, zBack);
-        var backTopRight = new Point3D(x1, y1, zBack);
+        AddMainRoofPlane(width, depth, scale);
+
+        var frontBottomLeft = new Point3D(x0, frontRoofY, zFront);
+        var frontBottomRight = new Point3D(x1, frontRoofY, zFront);
+        var frontTopLeft = new Point3D(x0, eaveY, zFront);
+        var frontTopRight = new Point3D(x1, eaveY, zFront);
+
+        var backBottomLeft = new Point3D(x0, backRoofY, zBack);
+        var backBottomRight = new Point3D(x1, backRoofY, zBack);
+        var backTopLeft = new Point3D(x0, eaveY, zBack);
+        var backTopRight = new Point3D(x1, eaveY, zBack);
 
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
-        AddEdge(backBottomLeft, backBottomRight, WidthKey);
         AddEdge(frontTopLeft, frontTopRight, WidthKey);
-        AddEdge(backTopLeft, backTopRight, WidthKey);
-
         AddEdge(frontBottomLeft, frontTopLeft, HeightKey);
         AddEdge(frontBottomRight, frontTopRight, HeightKey);
-        AddEdge(backBottomLeft, backTopLeft, HeightKey);
-        AddEdge(backBottomRight, backTopRight, HeightKey);
-
         AddEdge(frontBottomLeft, backBottomLeft, DepthKey);
         AddEdge(frontBottomRight, backBottomRight, DepthKey);
 
+        AddPassiveEdge(backBottomLeft, backBottomRight, _normalBrush, 0.025);
+        AddPassiveEdge(backBottomLeft, backTopLeft, _normalBrush, 0.025);
+        AddPassiveEdge(backBottomRight, backTopRight, _normalBrush, 0.025);
+
         if (HasGable)
         {
-            AddEdge(frontTopLeft, backTopLeft, DepthKey);
-            AddEdge(frontTopRight, backTopRight, DepthKey);
-
-            var frontApex = new Point3D(0, y1 + gable, zFront);
-            var backApex = new Point3D(0, y1 + gable, zBack);
+            var frontApex = new Point3D(0, eaveY + gable, zFront);
+            var backApex = new Point3D(0, eaveY + gable, zBack);
 
             AddEdge(frontTopLeft, frontApex, GableKey);
             AddEdge(frontApex, frontTopRight, GableKey);
-            AddEdge(backTopLeft, backApex, GableKey);
-            AddEdge(backApex, backTopRight, GableKey);
-            AddEdge(frontApex, backApex, DepthKey);
+
+            AddPassiveEdge(backTopLeft, backApex, _normalBrush, 0.025);
+            AddPassiveEdge(backApex, backTopRight, _normalBrush, 0.025);
+            AddPassiveEdge(frontApex, backApex, _normalBrush, 0.025);
+            AddPassiveEdge(frontTopLeft, backTopLeft, _normalBrush, 0.025);
+            AddPassiveEdge(frontTopRight, backTopRight, _normalBrush, 0.025);
         }
         else
         {
-            AddEdge(frontTopLeft, backTopLeft, DepthKey);
-            AddEdge(frontTopRight, backTopRight, DepthKey);
+            AddPassiveEdge(frontTopLeft, backTopLeft, _normalBrush, 0.025);
+            AddPassiveEdge(frontTopRight, backTopRight, _normalBrush, 0.025);
+            AddPassiveEdge(backTopLeft, backTopRight, _normalBrush, 0.025);
         }
 
-        AddGroundReference(width, depth, scale);
-        FitCamera(width, height + (HasGable ? gable : 0), depth);
+        var highestY = Math.Max(backRoofY, eaveY + (HasGable ? gable : 0));
+
+        if (resetView)
+        {
+            _cameraTarget = new Point3D(0, highestY * 0.42, 0);
+            var size = Math.Max(width, Math.Max(highestY, depth));
+            _cameraDistance = Math.Max(9.5, size * 2.75);
+            _cameraYawDeg = 38;
+            _cameraPitchDeg = 23;
+        }
+
+        UpdateCamera();
         HighlightSelectedDimension();
+    }
+
+    private void AddMainRoofPlane(double width, double depth, double scale)
+    {
+        var extensionX = Math.Max(width * 0.75, 1.4);
+        var extensionFront = Math.Max(depth * 0.55, 1.2);
+        var extensionBack = Math.Max(depth * 0.9, 1.8);
+
+        var roofX0 = -width / 2 - extensionX;
+        var roofX1 = width / 2 + extensionX;
+        var roofZFront = depth / 2 + extensionFront;
+        var roofZBack = -depth / 2 - extensionBack;
+
+        double RoofY(double z)
+        {
+            var dz = depth / 2 - z;
+            return Math.Tan(DegToRad(_roofPitchDeg)) * dz;
+        }
+
+        var p1 = new Point3D(roofX0, RoofY(roofZFront), roofZFront);
+        var p2 = new Point3D(roofX1, RoofY(roofZFront), roofZFront);
+        var p3 = new Point3D(roofX1, RoofY(roofZBack), roofZBack);
+        var p4 = new Point3D(roofX0, RoofY(roofZBack), roofZBack);
+
+        var roofLineRadius = Math.Max(0.012, 18 * scale);
+
+        AddPassiveEdge(p1, p2, _roofBrush, roofLineRadius);
+        AddPassiveEdge(p2, p3, _roofBrush, roofLineRadius);
+        AddPassiveEdge(p3, p4, _roofBrush, roofLineRadius);
+        AddPassiveEdge(p4, p1, _roofBrush, roofLineRadius);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            var t = i / 6.0;
+            var z = roofZFront + (roofZBack - roofZFront) * t;
+
+            AddPassiveEdge(
+                new Point3D(roofX0, RoofY(z), z),
+                new Point3D(roofX1, RoofY(z), z),
+                _roofGridBrush,
+                Math.Max(0.008, 10 * scale));
+        }
     }
 
     private double ComputeScale()
     {
-        var maxMm = Math.Max(_widthMm, Math.Max(_heightMm + (HasGable ? _gableHeightMm : 0), _depthMm));
-        return 4.2 / Math.Max(maxMm, 1);
+        var roofRiseMm = Math.Tan(DegToRad(_roofPitchDeg)) * _depthMm;
+        var totalHeightMm = Math.Max(
+            _frontWallHeightMm + (HasGable ? _gableHeightMm : 0),
+            roofRiseMm);
+
+        var maxMm = Math.Max(_widthMm, Math.Max(totalHeightMm, _depthMm));
+        return 3.5 / Math.Max(maxMm, 1);
     }
 
-    private void AddGroundReference(double width, double depth, double scale)
+    private void DormerViewport_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        var margin = Math.Max(250 * scale, 0.25);
-        var y = -0.035;
-        var x0 = -width / 2 - margin;
-        var x1 = width / 2 + margin;
-        var z0 = -depth / 2 - margin;
-        var z1 = depth / 2 + margin;
-
-        var brush = new SolidColorBrush(Color.FromRgb(207, 214, 221));
-        AddPassiveEdge(new Point3D(x0, y, z0), new Point3D(x1, y, z0), brush, 0.014);
-        AddPassiveEdge(new Point3D(x1, y, z0), new Point3D(x1, y, z1), brush, 0.014);
-        AddPassiveEdge(new Point3D(x1, y, z1), new Point3D(x0, y, z1), brush, 0.014);
-        AddPassiveEdge(new Point3D(x0, y, z1), new Point3D(x0, y, z0), brush, 0.014);
+        var factor = e.Delta > 0 ? 0.88 : 1.14;
+        _cameraDistance *= factor;
+        _cameraDistance = Math.Clamp(_cameraDistance, 2.5, 60.0);
+        UpdateCamera();
+        e.Handled = true;
     }
 
-    private void FitCamera(double width, double totalHeight, double depth)
+    private void DormerViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var size = Math.Max(width, Math.Max(totalHeight, depth));
-        var centerY = totalHeight * 0.45;
+        _isOrbiting = true;
+        _leftDragExceededThreshold = false;
+        _mouseDownPosition = e.GetPosition(DormerViewport);
+        _lastMousePosition = _mouseDownPosition;
+        DormerViewport.CaptureMouse();
+    }
 
-        DormerCamera.Position = new Point3D(size * 1.45, centerY + size * 0.75, size * 1.65);
-        DormerCamera.LookDirection = new Vector3D(
-            -DormerCamera.Position.X,
-            centerY - DormerCamera.Position.Y,
-            -DormerCamera.Position.Z);
+    private void DormerViewport_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_leftDragExceededThreshold && _pendingDimensionKey is not null)
+            SelectDimension(_pendingDimensionKey);
+
+        _pendingDimensionKey = null;
+        _isOrbiting = false;
+
+        if (!_isPanning)
+            DormerViewport.ReleaseMouseCapture();
+    }
+
+    private void DormerViewport_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = true;
+        _lastMousePosition = e.GetPosition(DormerViewport);
+        DormerViewport.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void DormerViewport_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = false;
+
+        if (!_isOrbiting)
+            DormerViewport.ReleaseMouseCapture();
+
+        e.Handled = true;
+    }
+
+    private void DormerViewport_MouseMove(object sender, MouseEventArgs e)
+    {
+        var current = e.GetPosition(DormerViewport);
+        var delta = current - _lastMousePosition;
+
+        if (_isOrbiting && e.LeftButton == MouseButtonState.Pressed)
+        {
+            var totalDelta = current - _mouseDownPosition;
+            if (Math.Abs(totalDelta.X) > 4 || Math.Abs(totalDelta.Y) > 4)
+                _leftDragExceededThreshold = true;
+
+            if (_leftDragExceededThreshold)
+            {
+                _cameraYawDeg += delta.X * 0.34;
+                _cameraPitchDeg -= delta.Y * 0.28;
+                _cameraPitchDeg = Math.Clamp(_cameraPitchDeg, -12, 82);
+                UpdateCamera();
+            }
+        }
+
+        if (_isPanning && e.RightButton == MouseButtonState.Pressed)
+        {
+            PanCamera(delta);
+        }
+
+        _lastMousePosition = current;
+    }
+
+    private void PanCamera(Vector delta)
+    {
+        var look = DormerCamera.LookDirection;
+        look.Normalize();
+
+        var up = DormerCamera.UpDirection;
+        up.Normalize();
+
+        var right = Vector3D.CrossProduct(look, up);
+        if (right.Length < 0.0001)
+            return;
+
+        right.Normalize();
+
+        var screenUp = Vector3D.CrossProduct(right, look);
+        screenUp.Normalize();
+
+        var scale = _cameraDistance * 0.0018;
+
+        _cameraTarget += right * (-delta.X * scale);
+        _cameraTarget += screenUp * (delta.Y * scale);
+
+        UpdateCamera();
+    }
+
+    private void UpdateCamera()
+    {
+        var yaw = DegToRad(_cameraYawDeg);
+        var pitch = DegToRad(_cameraPitchDeg);
+
+        var horizontal = _cameraDistance * Math.Cos(pitch);
+
+        var x = _cameraTarget.X + horizontal * Math.Sin(yaw);
+        var z = _cameraTarget.Z + horizontal * Math.Cos(yaw);
+        var y = _cameraTarget.Y + _cameraDistance * Math.Sin(pitch);
+
+        DormerCamera.Position = new Point3D(x, y, z);
+        DormerCamera.LookDirection = _cameraTarget - DormerCamera.Position;
         DormerCamera.UpDirection = new Vector3D(0, 1, 0);
     }
 
@@ -261,10 +459,10 @@ public partial class MainWindow : Window
     {
         var model = CreateLineModel(start, end, _normalBrush, 0.035);
         var element = new ModelUIElement3D { Model = model };
-        element.MouseLeftButtonDown += (_, e) =>
+
+        element.MouseLeftButtonDown += (_, _) =>
         {
-            SelectDimension(dimensionKey);
-            e.Handled = true;
+            _pendingDimensionKey = dimensionKey;
         };
 
         if (!_dimensionEdges.TryGetValue(dimensionKey, out var list))
@@ -290,6 +488,7 @@ public partial class MainWindow : Window
         foreach (var pair in _dimensionEdges)
         {
             var selected = pair.Key == _selectedDimension;
+
             foreach (var element in pair.Value)
             {
                 if (element.Model is GeometryModel3D geometry)
@@ -302,14 +501,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private static double DegToRad(double degrees)
+        => degrees * Math.PI / 180.0;
+
     private static GeometryModel3D CreateLineModel(Point3D start, Point3D end, Brush brush, double radius)
     {
         const int sides = 10;
-        var axis = end - start;
-        var length = axis.Length;
 
-        if (length < 0.0001)
-            length = 0.0001;
+        var axis = end - start;
+        if (axis.Length < 0.0001)
+            axis = new Vector3D(0, 0.0001, 0);
 
         var direction = axis;
         direction.Normalize();
@@ -330,6 +531,7 @@ public partial class MainWindow : Window
         {
             var angle = 2 * Math.PI * i / sides;
             var offset = u * (Math.Cos(angle) * radius) + v * (Math.Sin(angle) * radius);
+
             mesh.Positions.Add(start + offset);
             mesh.Positions.Add(end + offset);
         }
@@ -352,6 +554,7 @@ public partial class MainWindow : Window
         }
 
         var material = new DiffuseMaterial(brush);
+
         return new GeometryModel3D(mesh, material)
         {
             BackMaterial = material
