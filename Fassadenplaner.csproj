@@ -10,4 +10,8 @@
     <RootNamespace>Fassadenplaner</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\\roof_tiles.jpg" />
+  </ItemGroup>
+
 </Project>
