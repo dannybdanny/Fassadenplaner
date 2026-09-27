@@ -921,32 +921,91 @@ public partial class MainWindow : Window
 
     private void AddTexturedQuadSurface(Point3D p1, Point3D p2, Point3D p3, Point3D p4)
     {
-        var mesh = new MeshGeometry3D();
+        var bitmap = LoadRoofTextureBitmap();
 
-        mesh.Positions.Add(p1);
-        mesh.Positions.Add(p2);
-        mesh.Positions.Add(p3);
-        mesh.Positions.Add(p4);
-
-        // Ein einziges UV-Rechteck über die gesamte Dachfläche.
-        mesh.TextureCoordinates.Add(new Point(0, 1));
-        mesh.TextureCoordinates.Add(new Point(1, 1));
-        mesh.TextureCoordinates.Add(new Point(1, 0));
-        mesh.TextureCoordinates.Add(new Point(0, 0));
-
-        mesh.TriangleIndices.Add(0);
-        mesh.TriangleIndices.Add(1);
-        mesh.TriangleIndices.Add(2);
-
-        mesh.TriangleIndices.Add(0);
-        mesh.TriangleIndices.Add(2);
-        mesh.TriangleIndices.Add(3);
+        if (bitmap is null)
+        {
+            AddQuadSurface(
+                p1, p2, p3, p4,
+                new SolidColorBrush(Color.FromRgb(105, 100, 94)));
+            return;
+        }
 
         var roofWidth = (p2 - p1).Length;
         var roofSlopeLength = (p4 - p1).Length;
 
-        var textureBrush = CreateSeamlessRoofTextureBrush(roofWidth, roofSlopeLength);
-        var material = new DiffuseMaterial(textureBrush);
+        var sourceAspect =
+            bitmap.PixelHeight > 0
+                ? (double)bitmap.PixelWidth / bitmap.PixelHeight
+                : 1.0;
+
+        var roofAspect =
+            roofSlopeLength > 0.0001
+                ? roofWidth / roofSlopeLength
+                : 1.0;
+
+        // Echte Rasterung der 3D-Fläche:
+        // Jede Zelle bekommt die komplette Originaltextur von 0..1.
+        // Dadurch wird das Bild nicht mehr über die gesamte Dachfläche hochskaliert.
+        const int tilesAlongSlope = 4;
+
+        var tilesAcross = Math.Clamp(
+            (int)Math.Round(
+                (roofAspect / Math.Max(sourceAspect, 0.01)) *
+                tilesAlongSlope),
+            2,
+            10);
+
+        var mesh = new MeshGeometry3D();
+
+        for (var row = 0; row < tilesAlongSlope; row++)
+        {
+            var v0 = (double)row / tilesAlongSlope;
+            var v1 = (double)(row + 1) / tilesAlongSlope;
+
+            for (var column = 0; column < tilesAcross; column++)
+            {
+                var u0 = (double)column / tilesAcross;
+                var u1 = (double)(column + 1) / tilesAcross;
+
+                var q1 = BilinearPoint(p1, p2, p3, p4, u0, v0);
+                var q2 = BilinearPoint(p1, p2, p3, p4, u1, v0);
+                var q3 = BilinearPoint(p1, p2, p3, p4, u1, v1);
+                var q4 = BilinearPoint(p1, p2, p3, p4, u0, v1);
+
+                var baseIndex = mesh.Positions.Count;
+
+                mesh.Positions.Add(q1);
+                mesh.Positions.Add(q2);
+                mesh.Positions.Add(q3);
+                mesh.Positions.Add(q4);
+
+                // Jede Rasterzelle zeigt das komplette Texturbild.
+                mesh.TextureCoordinates.Add(new Point(0, 1));
+                mesh.TextureCoordinates.Add(new Point(1, 1));
+                mesh.TextureCoordinates.Add(new Point(1, 0));
+                mesh.TextureCoordinates.Add(new Point(0, 0));
+
+                mesh.TriangleIndices.Add(baseIndex);
+                mesh.TriangleIndices.Add(baseIndex + 1);
+                mesh.TriangleIndices.Add(baseIndex + 2);
+
+                mesh.TriangleIndices.Add(baseIndex);
+                mesh.TriangleIndices.Add(baseIndex + 2);
+                mesh.TriangleIndices.Add(baseIndex + 3);
+            }
+        }
+
+        var brush = new ImageBrush(bitmap)
+        {
+            Stretch = Stretch.Fill,
+            TileMode = TileMode.None,
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top
+        };
+        brush.Freeze();
+
+        var material = new DiffuseMaterial(brush);
 
         DormerViewport.Children.Add(new ModelVisual3D
         {
@@ -957,7 +1016,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private static Brush CreateSeamlessRoofTextureBrush(double roofWidth, double roofSlopeLength)
+    private static BitmapImage? LoadRoofTextureBitmap()
     {
         try
         {
@@ -965,44 +1024,53 @@ public partial class MainWindow : Window
                 new Uri("Assets/roof_tiles.jpg", UriKind.Relative));
 
             if (resource is null)
-                throw new InvalidOperationException("Ziegeltextur wurde nicht als WPF-Ressource gefunden.");
+                return null;
 
-            BitmapImage bitmap;
+            using var stream = resource.Stream;
 
-            using (var stream = resource.Stream)
-            {
-                bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.StreamSource = stream;
-                bitmap.EndInit();
-                bitmap.Freeze();
-            }
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
 
-            // Das gelieferte Bild enthält bereits viele Ziegelreihen.
-            // Es wird deshalb genau EINMAL auf die komplette Dachfläche gelegt.
-            // Keine ImageBrush-Kachelung und keine Zwischenbitmap mehr.
-            var brush = new ImageBrush(bitmap)
-            {
-                Stretch = Stretch.Fill,
-                TileMode = TileMode.None,
-                Viewbox = new Rect(0, 0, 1, 1),
-                ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
-                Viewport = new Rect(0, 0, 1, 1),
-                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Top
-            };
+            RenderOptions.SetBitmapScalingMode(
+                bitmap,
+                BitmapScalingMode.HighQuality);
 
-            brush.Freeze();
-            return brush;
+            bitmap.Freeze();
+            return bitmap;
         }
         catch
         {
-            var fallback = new SolidColorBrush(Color.FromRgb(105, 100, 94));
-            fallback.Freeze();
-            return fallback;
+            return null;
         }
+    }
+
+    private static Point3D BilinearPoint(
+        Point3D p1,
+        Point3D p2,
+        Point3D p3,
+        Point3D p4,
+        double u,
+        double v)
+    {
+        var top =
+            new Point3D(
+                p1.X + (p2.X - p1.X) * u,
+                p1.Y + (p2.Y - p1.Y) * u,
+                p1.Z + (p2.Z - p1.Z) * u);
+
+        var bottom =
+            new Point3D(
+                p4.X + (p3.X - p4.X) * u,
+                p4.Y + (p3.Y - p4.Y) * u,
+                p4.Z + (p3.Z - p4.Z) * u);
+
+        return new Point3D(
+            top.X + (bottom.X - top.X) * v,
+            top.Y + (bottom.Y - top.Y) * v,
+            top.Z + (bottom.Z - top.Z) * v);
     }
 
     private void ShowSurfaceDetail(string surfaceKey)
@@ -1136,6 +1204,7 @@ public partial class MainWindow : Window
         const double maxHeight = 126;
 
         var maxVerticalMm = Math.Max(backRiseMm, _frontWallHeightMm);
+
         var scale = Math.Min(
             maxWidth / Math.Max(_depthMm, 1),
             maxHeight / Math.Max(maxVerticalMm, 1));
@@ -1145,9 +1214,21 @@ public partial class MainWindow : Window
         var backH = backRiseMm * scale;
 
         var baseY = top + maxVerticalMm * scale;
-        var frontBottom = new Point(left, baseY);
-        var frontTop = new Point(left, baseY - frontH);
-        var backPoint = new Point(left + d, baseY - backH);
+
+        // Linke und rechte Wange werden als echte Gegenstücke dargestellt.
+        // Rechts: Frontkante links, Dachanschluss rechts.
+        // Links:  Frontkante rechts, Dachanschluss links.
+        var frontX = isLeft
+            ? left + d
+            : left;
+
+        var backX = isLeft
+            ? left
+            : left + d;
+
+        var frontBottom = new Point(frontX, baseY);
+        var frontTop = new Point(frontX, baseY - frontH);
+        var backPoint = new Point(backX, baseY - backH);
 
         AddDetailPolygon(
             new PointCollection
@@ -1158,7 +1239,7 @@ public partial class MainWindow : Window
             });
 
         AddVerticalDimension(
-            left - 26,
+            isLeft ? frontX + 26 : frontX - 26,
             frontBottom.Y,
             frontTop.Y,
             FormatCentimeters(_frontWallHeightMm));
@@ -1167,13 +1248,13 @@ public partial class MainWindow : Window
             frontTop,
             backPoint,
             FormatCentimeters(GetDisplayedDepthMm()),
-            -15);
+            isLeft ? 15 : -15);
 
         AddDimensionAlongEdge(
             frontBottom,
             backPoint,
             FormatCentimeters(_slopeLengthMm),
-            17);
+            isLeft ? -17 : 17);
     }
 
     private void AddDetailPolygon(PointCollection points)
