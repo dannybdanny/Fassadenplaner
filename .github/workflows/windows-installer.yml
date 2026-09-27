@@ -90,6 +90,14 @@ jobs:
           $latestPath = Join-Path $target "Fassadenplaner-Setup-LATEST.exe"
           Copy-Item $installer.FullName $latestPath -Force
 
+          $portableExe = Get-ChildItem "publish\\Fassadenplaner-win-x64\\Fassadenplaner.exe" -ErrorAction Stop
+          $portableVersionedName = "Fassadenplaner-${{ github.run_number }}-win-x64.exe"
+          $portableVersionedPath = Join-Path $target $portableVersionedName
+          Copy-Item $portableExe.FullName $portableVersionedPath -Force
+
+          $portableLatestPath = Join-Path $target "Fassadenplaner-LATEST.exe"
+          Copy-Item $portableExe.FullName $portableLatestPath -Force
+
           $codeCommit = git rev-parse HEAD
 
           @"
@@ -105,3 +113,5 @@ jobs:
           Write-Host "Fertig:"
           Write-Host $versionedPath
           Write-Host $latestPath
+          Write-Host $portableVersionedPath
+          Write-Host $portableLatestPath
