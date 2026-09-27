@@ -159,6 +159,7 @@
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
                             <RowDefinition x:Name="GableRow" Height="0"/>
                         </Grid.RowDefinitions>
 
@@ -168,15 +169,24 @@
                         <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#53616D"/>
                         <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="1600 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="2" Text="Einbindetiefe (berechnet)" Foreground="#53616D"/>
-                        <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="1800 mm" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Row="2" Text="Gaubentiefe waagerecht" Foreground="#53616D"/>
+                        <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="2285 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="3" Text="Hauptdachneigung" Foreground="#53616D"/>
-                        <TextBlock x:Name="PitchValueText" Grid.Row="3" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Row="3" Text="Untere Wangenlänge" Foreground="#53616D"/>
+                        <TextBlock x:Name="SlopeValueText" Grid.Row="3" Grid.Column="1" Text="2790 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock x:Name="GableLabel" Grid.Row="4" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
-                        <TextBlock x:Name="GableValueText" Grid.Row="4" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
+                        <TextBlock Grid.Row="4" Text="Hauptdachneigung" Foreground="#53616D"/>
+                        <TextBlock x:Name="PitchValueText" Grid.Row="4" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
+
+                        <TextBlock x:Name="GableLabel" Grid.Row="5" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
+                        <TextBlock x:Name="GableValueText" Grid.Row="5" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
                     </Grid>
+
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="11"
+                               Foreground="#8A949D"
+                               TextWrapping="Wrap"
+                               Text="Dachneigung + Höhe berechnen Tiefe und Wangenlänge. Gibst du Tiefe oder Wangenlänge ein, wird daraus die Dachneigung berechnet."/>
 
                     <Border Height="1" Background="#E3E7EB" Margin="0,24,0,18"/>
 
@@ -221,7 +231,7 @@
 
                     <Canvas x:Name="DimensionOverlay"
                             Margin="8"
-                            IsHitTestVisible="False"/>
+                            Panel.ZIndex="5"/>
 
                     <Border HorizontalAlignment="Left"
                             VerticalAlignment="Top"
