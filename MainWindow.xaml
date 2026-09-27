@@ -73,6 +73,7 @@
                               SelectionChanged="DormerTypeCombo_SelectionChanged">
                         <ComboBoxItem Content="Flachdachgaube"/>
                         <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
+                        <ComboBoxItem Content="Schleppdachgaube"/>
                     </ComboBox>
 
                     <TextBlock Text="Hauptdachneigung" Style="{StaticResource LabelStyle}"/>
@@ -98,6 +99,34 @@
                                 Margin="5,0,0,0"
                                 Click="ApplyRoofPitch_Click"/>
                     </Grid>
+
+                    <StackPanel x:Name="DormerPitchPanel"
+                                Visibility="Collapsed"
+                                Margin="0,0,0,20">
+                        <TextBlock Text="Gaubendachneigung" Style="{StaticResource LabelStyle}"/>
+                        <Grid Margin="0,7,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="102"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="DormerPitchBox"
+                                     Grid.Column="0"
+                                     Text="10"
+                                     PreviewKeyDown="DormerPitchBox_PreviewKeyDown"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="°"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       FontSize="14"
+                                       Foreground="#6E7A86"/>
+                            <Button Grid.Column="2"
+                                    Content="Übernehmen"
+                                    Height="38"
+                                    Margin="5,0,0,0"
+                                    Click="ApplyDormerPitch_Click"/>
+                        </Grid>
+                    </StackPanel>
 
                     <Border Background="#F5F7F9"
                             BorderBrush="#DDE3E9"
@@ -160,6 +189,7 @@
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
+                            <RowDefinition x:Name="ShedPitchRow" Height="0"/>
                             <RowDefinition x:Name="GableRow" Height="0"/>
                         </Grid.RowDefinitions>
 
@@ -169,7 +199,7 @@
                         <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#53616D"/>
                         <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="160 cm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="2" Text="Gaubentiefe waagerecht" Foreground="#53616D"/>
+                        <TextBlock x:Name="DepthLabel" Grid.Row="2" Text="Gaubentiefe" Foreground="#53616D"/>
                         <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="228,5 cm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="3" Text="Untere Wangenlänge" Foreground="#53616D"/>
@@ -178,15 +208,18 @@
                         <TextBlock Grid.Row="4" Text="Hauptdachneigung" Foreground="#53616D"/>
                         <TextBlock x:Name="PitchValueText" Grid.Row="4" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
 
-                        <TextBlock x:Name="GableLabel" Grid.Row="5" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
-                        <TextBlock x:Name="GableValueText" Grid.Row="5" Grid.Column="1" Text="80 cm" FontWeight="SemiBold" Visibility="Collapsed"/>
+                        <TextBlock x:Name="DormerPitchLabel" Grid.Row="5" Text="Gaubendachneigung" Foreground="#53616D" Visibility="Collapsed"/>
+                        <TextBlock x:Name="DormerPitchValueText" Grid.Row="5" Grid.Column="1" Text="10°" FontWeight="SemiBold" Visibility="Collapsed"/>
+
+                        <TextBlock x:Name="GableLabel" Grid.Row="6" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
+                        <TextBlock x:Name="GableValueText" Grid.Row="6" Grid.Column="1" Text="80 cm" FontWeight="SemiBold" Visibility="Collapsed"/>
                     </Grid>
 
                     <TextBlock Margin="0,8,0,0"
                                FontSize="11"
                                Foreground="#8A949D"
                                TextWrapping="Wrap"
-                               Text="Dachneigung + Höhe berechnen Tiefe und Wangenlänge. Gibst du Tiefe oder Wangenlänge ein, wird daraus die Dachneigung berechnet."/>
+                               Text="Höhe und Dachneigung bestimmen die Gaubengeometrie. Bei der Schleppdachgaube wird zusätzlich die Gaubendachneigung berücksichtigt; Standard: 10°."/>
 
                     <Border Height="1" Background="#E3E7EB" Margin="0,24,0,18"/>
 
