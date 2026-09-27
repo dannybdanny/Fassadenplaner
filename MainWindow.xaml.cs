@@ -136,14 +136,14 @@ public partial class MainWindow : Window
     private void ApplySelectedDimension()
     {
         var text = DimensionValueBox.Text
-            .Replace("mm", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("cm", string.Empty, StringComparison.OrdinalIgnoreCase)
             .Trim()
             .Replace(',', '.');
 
-        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) || value <= 0)
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var valueCm) || valueCm <= 0)
         {
             MessageBox.Show(
-                "Bitte ein gültiges Maß größer als 0 mm eingeben.",
+                "Bitte ein gültiges Maß größer als 0 cm eingeben.",
                 "Ungültiges Maß",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -153,24 +153,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        var valueMm = valueCm * 10.0;
+
         switch (_selectedDimension)
         {
             case WidthKey:
-                _widthMm = value;
+                _widthMm = valueMm;
                 break;
 
             case HeightKey:
-                _frontWallHeightMm = value;
+                _frontWallHeightMm = valueMm;
                 RecalculateFromPitchAndHeight();
                 break;
 
             case DepthKey:
-                _depthMm = value;
+                _depthMm = valueMm;
                 RecalculateFromHeightAndDepth();
                 break;
 
             case SlopeKey:
-                if (value <= _frontWallHeightMm)
+                if (valueMm <= _frontWallHeightMm)
                 {
                     MessageBox.Show(
                         "Die untere Wangenlänge muss größer als die senkrechte Wandhöhe sein.",
@@ -180,12 +182,12 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                _slopeLengthMm = value;
+                _slopeLengthMm = valueMm;
                 RecalculateFromHeightAndSlope();
                 break;
 
             case GableKey:
-                _gableHeightMm = value;
+                _gableHeightMm = valueMm;
                 break;
         }
 
@@ -231,17 +233,22 @@ public partial class MainWindow : Window
 
     private void RefreshDimensionSummary()
     {
-        WidthValueText.Text = FormatMillimeters(_widthMm);
-        HeightValueText.Text = FormatMillimeters(_frontWallHeightMm);
-        DepthValueText.Text = FormatMillimeters(_depthMm);
-        SlopeValueText.Text = FormatMillimeters(_slopeLengthMm);
-        GableValueText.Text = FormatMillimeters(_gableHeightMm);
+        WidthValueText.Text = FormatCentimeters(_widthMm);
+        HeightValueText.Text = FormatCentimeters(_frontWallHeightMm);
+        DepthValueText.Text = FormatCentimeters(_depthMm);
+        SlopeValueText.Text = FormatCentimeters(_slopeLengthMm);
+        GableValueText.Text = FormatCentimeters(_gableHeightMm);
         PitchValueText.Text = $"{_roofPitchDeg:0.#}°";
         RoofPitchBox.Text = _roofPitchDeg.ToString("0.#", CultureInfo.InvariantCulture);
     }
 
-    private static string FormatMillimeters(double value)
-        => $"{value:0} mm";
+    private static readonly CultureInfo GermanCulture = CultureInfo.GetCultureInfo("de-DE");
+
+    private static string FormatCentimeters(double valueMm)
+        => $"{(valueMm / 10.0).ToString("0.#", GermanCulture)} cm";
+
+    private static string FormatCentimetersInput(double valueMm)
+        => (valueMm / 10.0).ToString("0.#", GermanCulture);
 
     private void SelectDimension(string key)
     {
@@ -252,31 +259,31 @@ public partial class MainWindow : Window
             case WidthKey:
                 SelectedDimensionTitle.Text = "Gaubenbreite";
                 SelectedDimensionHint.Text = "Horizontale Kante der Gaubenfront";
-                DimensionValueBox.Text = _widthMm.ToString("0", CultureInfo.InvariantCulture);
+                DimensionValueBox.Text = FormatCentimetersInput(_widthMm);
                 break;
 
             case HeightKey:
                 SelectedDimensionTitle.Text = "Front-Wandhöhe";
                 SelectedDimensionHint.Text = "Senkrechte Kante der Gaubenfront. Änderung behält die aktuelle Dachneigung bei.";
-                DimensionValueBox.Text = _frontWallHeightMm.ToString("0", CultureInfo.InvariantCulture);
+                DimensionValueBox.Text = FormatCentimetersInput(_frontWallHeightMm);
                 break;
 
             case DepthKey:
                 SelectedDimensionTitle.Text = "Gaubentiefe";
                 SelectedDimensionHint.Text = "Waagerechte obere Wangenkante. Aus Höhe + Tiefe wird die Dachneigung berechnet.";
-                DimensionValueBox.Text = _depthMm.ToString("0", CultureInfo.InvariantCulture);
+                DimensionValueBox.Text = FormatCentimetersInput(_depthMm);
                 break;
 
             case SlopeKey:
                 SelectedDimensionTitle.Text = "Untere Wangenlänge";
                 SelectedDimensionHint.Text = "Gemessene schräge Kante auf dem Hauptdach. Aus Höhe + Wangenlänge wird die Dachneigung berechnet.";
-                DimensionValueBox.Text = _slopeLengthMm.ToString("0", CultureInfo.InvariantCulture);
+                DimensionValueBox.Text = FormatCentimetersInput(_slopeLengthMm);
                 break;
 
             case GableKey:
                 SelectedDimensionTitle.Text = "Giebelhöhe";
                 SelectedDimensionHint.Text = "Senkrechte Höhe von der Trauflinie bis zur Giebelspitze";
-                DimensionValueBox.Text = _gableHeightMm.ToString("0", CultureInfo.InvariantCulture);
+                DimensionValueBox.Text = FormatCentimetersInput(_gableHeightMm);
                 break;
         }
 
@@ -729,6 +736,7 @@ public partial class MainWindow : Window
         mesh.Positions.Add(p3);
         mesh.Positions.Add(p4);
 
+        // Ein einziges UV-Rechteck über die gesamte Dachfläche.
         mesh.TextureCoordinates.Add(new Point(0, 1));
         mesh.TextureCoordinates.Add(new Point(1, 1));
         mesh.TextureCoordinates.Add(new Point(1, 0));
@@ -742,7 +750,10 @@ public partial class MainWindow : Window
         mesh.TriangleIndices.Add(2);
         mesh.TriangleIndices.Add(3);
 
-        var textureBrush = CreateRoofTextureBrush();
+        var roofWidth = (p2 - p1).Length;
+        var roofSlopeLength = (p4 - p1).Length;
+
+        var textureBrush = CreateSeamlessRoofTextureBrush(roofWidth, roofSlopeLength);
         var material = new DiffuseMaterial(textureBrush);
 
         DormerViewport.Children.Add(new ModelVisual3D
@@ -754,7 +765,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private static Brush CreateRoofTextureBrush()
+    private static Brush CreateSeamlessRoofTextureBrush(double roofWidth, double roofSlopeLength)
     {
         try
         {
@@ -764,21 +775,69 @@ public partial class MainWindow : Window
             if (resource is null)
                 throw new InvalidOperationException("Ziegeltextur wurde nicht als WPF-Ressource gefunden.");
 
-            using var stream = resource.Stream;
+            BitmapImage source;
 
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = stream;
-            bitmap.EndInit();
-            bitmap.Freeze();
+            using (var stream = resource.Stream)
+            {
+                source = new BitmapImage();
+                source.BeginInit();
+                source.CacheOption = BitmapCacheOption.OnLoad;
+                source.StreamSource = stream;
+                source.EndInit();
+                source.Freeze();
+            }
 
-            var brush = new ImageBrush(bitmap)
+            // Wir erzeugen zuerst EIN fertiges lückenloses Bild.
+            // Das WPF-3D-Material muss danach selbst nichts mehr kacheln.
+            var sourceWidth = Math.Max(1, source.PixelWidth);
+            var sourceHeight = Math.Max(1, source.PixelHeight);
+
+            var roofAspect = roofSlopeLength > 0.0001
+                ? roofWidth / roofSlopeLength
+                : 1.0;
+
+            // Zwei komplette Texturhöhen ergeben einen ruhigen,
+            // aber noch deutlich erkennbaren Ziegelmaßstab.
+            var targetHeight = Math.Clamp(sourceHeight * 2, 256, 1024);
+            var targetWidth = Math.Clamp(
+                (int)Math.Round(targetHeight * roofAspect),
+                256,
+                1536);
+
+            var visual = new DrawingVisual();
+
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(
+                    new SolidColorBrush(Color.FromRgb(72, 67, 60)),
+                    null,
+                    new Rect(0, 0, targetWidth, targetHeight));
+
+                for (var y = 0; y < targetHeight; y += sourceHeight)
+                {
+                    for (var x = 0; x < targetWidth; x += sourceWidth)
+                    {
+                        dc.DrawImage(
+                            source,
+                            new Rect(x, y, sourceWidth, sourceHeight));
+                    }
+                }
+            }
+
+            var tiledBitmap = new RenderTargetBitmap(
+                targetWidth,
+                targetHeight,
+                96,
+                96,
+                PixelFormats.Pbgra32);
+
+            tiledBitmap.Render(visual);
+            tiledBitmap.Freeze();
+
+            var brush = new ImageBrush(tiledBitmap)
             {
                 Stretch = Stretch.Fill,
-                TileMode = TileMode.Tile,
-                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
-                Viewport = new Rect(0, 0, 0.22, 0.22),
+                TileMode = TileMode.None,
                 AlignmentX = AlignmentX.Left,
                 AlignmentY = AlignmentY.Top
             };
@@ -788,7 +847,8 @@ public partial class MainWindow : Window
         }
         catch
         {
-            var fallback = new SolidColorBrush(Color.FromRgb(128, 128, 128));
+            // Nur als Notfall-Fallback; normal darf dieser Zweig nicht mehr sichtbar werden.
+            var fallback = new SolidColorBrush(Color.FromRgb(105, 100, 94));
             fallback.Freeze();
             return fallback;
         }
@@ -869,9 +929,9 @@ public partial class MainWindow : Window
             {
                 Tag = key,
                 Content = GetDimensionOverlayText(key),
-                Height = 27,
-                Padding = new Thickness(7, 0, 7, 0),
-                FontSize = 11.5,
+                Height = 23,
+                Padding = new Thickness(5, 0, 5, 0),
+                FontSize = 10.5,
                 FontWeight = FontWeights.SemiBold,
                 Background = selected
                     ? new SolidColorBrush(Color.FromRgb(229, 243, 251))
@@ -902,11 +962,11 @@ public partial class MainWindow : Window
 
     private string GetDimensionOverlayText(string key) => key switch
     {
-        WidthKey => $"{_widthMm:0} mm",
-        HeightKey => $"{_frontWallHeightMm:0} mm",
-        DepthKey => $"{_depthMm:0} mm",
-        SlopeKey => $"{_slopeLengthMm:0} mm",
-        GableKey => $"{_gableHeightMm:0} mm",
+        WidthKey => FormatCentimeters(_widthMm),
+        HeightKey => FormatCentimeters(_frontWallHeightMm),
+        DepthKey => FormatCentimeters(_depthMm),
+        SlopeKey => FormatCentimeters(_slopeLengthMm),
+        GableKey => FormatCentimeters(_gableHeightMm),
         _ => string.Empty
     };
 
