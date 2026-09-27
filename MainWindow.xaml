@@ -79,7 +79,8 @@
                     <Grid Margin="0,7,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
+                            <ColumnDefinition Width="38"/>
+                            <ColumnDefinition Width="102"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="RoofPitchBox"
                                  Grid.Column="0"
@@ -91,6 +92,11 @@
                                    HorizontalAlignment="Center"
                                    FontSize="14"
                                    Foreground="#6E7A86"/>
+                        <Button Grid.Column="2"
+                                Content="Übernehmen"
+                                Height="38"
+                                Margin="5,0,0,0"
+                                Click="ApplyRoofPitch_Click"/>
                     </Grid>
 
                     <Border Background="#F5F7F9"
@@ -213,6 +219,10 @@
                         </Viewport3D.Camera>
                     </Viewport3D>
 
+                    <Canvas x:Name="DimensionOverlay"
+                            Margin="8"
+                            IsHitTestVisible="False"/>
+
                     <Border HorizontalAlignment="Left"
                             VerticalAlignment="Top"
                             Margin="22"
@@ -226,7 +236,7 @@
                                        FontSize="14"
                                        FontWeight="SemiBold"
                                        Foreground="#243440"/>
-                            <TextBlock Text="Hauptdach + Gaube als Wireframe"
+                            <TextBlock Text="Hauptdach texturiert · Maße direkt an den Kanten"
                                        Margin="0,2,0,0"
                                        FontSize="11.5"
                                        Foreground="#788590"/>
