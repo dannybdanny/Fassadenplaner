@@ -28,13 +28,13 @@ public partial class MainWindow : Window
     private string _selectedDimension = WidthKey;
 
     private readonly Dictionary<string, List<GeometryModel3D>> _dimensionEdges = new();
-    private readonly Dictionary<GeometryModel3D, string> _hitEdgeKeys = new();
+    private readonly List<(Point3D Start, Point3D End, string Key)> _dimensionHitSegments = new();
     private readonly Dictionary<GeometryModel3D, string> _surfaceKeys = new();
     private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
 
     private string? _selectedSurfaceKey;
 
-    private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(63, 77, 89));
+    private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(39, 52, 64));
     private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(24, 119, 173));
     private readonly Brush _roofBrush = new SolidColorBrush(Color.FromRgb(110, 116, 121));
     private readonly Brush _dormerFrontBrush = new SolidColorBrush(Color.FromRgb(232, 235, 238));
@@ -439,7 +439,7 @@ public partial class MainWindow : Window
     {
         DormerViewport.Children.Clear();
         _dimensionEdges.Clear();
-        _hitEdgeKeys.Clear();
+        _dimensionHitSegments.Clear();
         _surfaceKeys.Clear();
         _dimensionAnchors.Clear();
 
@@ -773,7 +773,14 @@ public partial class MainWindow : Window
 
     private (string? DimensionKey, string? SurfaceKey) HitTestScene(Point point)
     {
-        string? dimensionKey = null;
+        // Kanten werden rein in 2D gegen die projizierte Bildschirmposition geprüft.
+        // Dadurch brauchen wir keine großen transparenten 3D-Zylinder mehr,
+        // die an den Gaubenecken optisch Durchsicht / Artefakte erzeugen konnten.
+        var dimensionKey = HitTestProjectedDimensionEdge(point);
+
+        if (dimensionKey is not null)
+            return (dimensionKey, null);
+
         string? surfaceKey = null;
 
         VisualTreeHelper.HitTest(
@@ -781,29 +788,135 @@ public partial class MainWindow : Window
             null,
             result =>
             {
-                if (result is not RayMeshGeometry3DHitTestResult ray ||
-                    ray.ModelHit is not GeometryModel3D model)
-                {
-                    return HitTestResultBehavior.Continue;
-                }
-
-                if (_hitEdgeKeys.TryGetValue(model, out var edgeKey))
-                {
-                    dimensionKey = edgeKey;
-                    return HitTestResultBehavior.Stop;
-                }
-
-                if (surfaceKey is null &&
+                if (result is RayMeshGeometry3DHitTestResult ray &&
+                    ray.ModelHit is GeometryModel3D model &&
                     _surfaceKeys.TryGetValue(model, out var foundSurface))
                 {
                     surfaceKey = foundSurface;
+                    return HitTestResultBehavior.Stop;
                 }
 
                 return HitTestResultBehavior.Continue;
             },
             new PointHitTestParameters(point));
 
-        return (dimensionKey, surfaceKey);
+        return (null, surfaceKey);
+    }
+
+    private string? HitTestProjectedDimensionEdge(Point clickPoint)
+    {
+        const double hitTolerancePixels = 9.0;
+
+        string? closestKey = null;
+        var closestDistance = double.MaxValue;
+
+        foreach (var segment in _dimensionHitSegments)
+        {
+            var a = ProjectToViewport(segment.Start);
+            var b = ProjectToViewport(segment.End);
+
+            if (a is null || b is null)
+                continue;
+
+            var distance = DistancePointToSegment(
+                clickPoint,
+                a.Value,
+                b.Value);
+
+            if (distance <= hitTolerancePixels &&
+                distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestKey = segment.Key;
+            }
+        }
+
+        return closestKey;
+    }
+
+    private Point? ProjectToViewport(Point3D point)
+    {
+        var width = DormerViewport.ActualWidth;
+        var height = DormerViewport.ActualHeight;
+
+        if (width <= 1 || height <= 1)
+            return null;
+
+        var forward = DormerCamera.LookDirection;
+        if (forward.Length < 0.0001)
+            return null;
+        forward.Normalize();
+
+        var up = DormerCamera.UpDirection;
+        if (up.Length < 0.0001)
+            return null;
+        up.Normalize();
+
+        var right = Vector3D.CrossProduct(forward, up);
+        if (right.Length < 0.0001)
+            return null;
+        right.Normalize();
+
+        var trueUp = Vector3D.CrossProduct(right, forward);
+        trueUp.Normalize();
+
+        var relative = point - DormerCamera.Position;
+        var z = Vector3D.DotProduct(relative, forward);
+
+        if (z <= 0.01)
+            return null;
+
+        var tanHalfHorizontal =
+            Math.Tan(DegToRad(DormerCamera.FieldOfView) / 2.0);
+
+        var aspect = width / height;
+        var tanHalfVertical =
+            tanHalfHorizontal / Math.Max(aspect, 0.01);
+
+        var nx =
+            Vector3D.DotProduct(relative, right) /
+            (z * tanHalfHorizontal);
+
+        var ny =
+            Vector3D.DotProduct(relative, trueUp) /
+            (z * tanHalfVertical);
+
+        return new Point(
+            (nx + 1.0) * 0.5 * width,
+            (1.0 - ny) * 0.5 * height);
+    }
+
+    private static double DistancePointToSegment(
+        Point point,
+        Point start,
+        Point end)
+    {
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+
+        var lengthSquared = dx * dx + dy * dy;
+
+        if (lengthSquared < 0.0001)
+        {
+            var sx = point.X - start.X;
+            var sy = point.Y - start.Y;
+            return Math.Sqrt(sx * sx + sy * sy);
+        }
+
+        var t =
+            ((point.X - start.X) * dx +
+             (point.Y - start.Y) * dy) /
+            lengthSquared;
+
+        t = Math.Clamp(t, 0.0, 1.0);
+
+        var nearestX = start.X + t * dx;
+        var nearestY = start.Y + t * dy;
+
+        var px = point.X - nearestX;
+        var py = point.Y - nearestY;
+
+        return Math.Sqrt(px * px + py * py);
     }
 
     private static Button? FindButtonAncestor(DependencyObject? source)
@@ -1383,8 +1496,11 @@ public partial class MainWindow : Window
 
     private void AddEdge(Point3D start, Point3D end, string dimensionKey)
     {
-        // Dünne sichtbare Kontur.
-        var visibleModel = CreateLineModel(start, end, _normalBrush, 0.012);
+        // Schlichte, dünne und vollständig deckende Gaubenkontur.
+        // Die Klickfläche wird separat in 2D berechnet und braucht keine
+        // transparente 3D-Hilfsgeometrie mehr.
+        var visibleModel =
+            CreateLineModel(start, end, _normalBrush, 0.0065);
 
         DormerViewport.Children.Add(new ModelVisual3D
         {
@@ -1398,22 +1514,22 @@ public partial class MainWindow : Window
         }
 
         list.Add(visibleModel);
-
-        // Größerer unsichtbarer Trefferbereich: dünne Linien bleiben trotzdem leicht anklickbar.
-        var hitModel = CreateLineModel(start, end, Brushes.Transparent, 0.060);
-        _hitEdgeKeys[hitModel] = dimensionKey;
-
-        DormerViewport.Children.Add(new ModelVisual3D
-        {
-            Content = hitModel
-        });
+        _dimensionHitSegments.Add((start, end, dimensionKey));
     }
 
     private void AddPassiveEdge(Point3D start, Point3D end, Brush brush, double radius)
     {
+        var contourBrush = ReferenceEquals(brush, _normalBrush)
+            ? _normalBrush
+            : brush;
+
         DormerViewport.Children.Add(new ModelVisual3D
         {
-            Content = CreateLineModel(start, end, brush, radius)
+            Content = CreateLineModel(
+                start,
+                end,
+                contourBrush,
+                Math.Min(radius, 0.0065))
         });
     }
 
