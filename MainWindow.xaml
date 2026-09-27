@@ -2,69 +2,219 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Fassadenplaner"
-        Width="1280"
-        Height="800"
-        MinWidth="1000"
-        MinHeight="650"
+        Width="1380"
+        Height="860"
+        MinWidth="1100"
+        MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="#F3F5F7">
+    <Window.Resources>
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#697581"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderBrush" Value="#CBD3DB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#243746"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="355"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0"
                 Background="White"
-                BorderBrush="#D9DEE5"
-                BorderThickness="0,0,1,0"
-                Padding="24">
-            <StackPanel>
-                <TextBlock Text="Fassadenplaner"
-                           FontSize="28"
-                           FontWeight="SemiBold"
-                           Foreground="#18212B"/>
+                BorderBrush="#D8DEE5"
+                BorderThickness="0,0,1,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="26">
+                    <TextBlock Text="Fassadenplaner"
+                               FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="#18212B"/>
 
-                <TextBlock Text="3D-Plattenplanung für Fassade und Bekleidung"
-                           Margin="0,6,0,28"
-                           FontSize="13"
-                           Foreground="#65707D"
-                           TextWrapping="Wrap"/>
+                    <TextBlock Text="Gaubenfläche erfassen"
+                               Margin="0,5,0,4"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="#3A4956"/>
 
-                <TextBlock Text="Projekt" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
-                <TextBox Margin="0,7,0,18" Height="36" Padding="10,7" Text="Neues Projekt"/>
+                    <TextBlock Text="Gaube auswählen, Kante im 3D-Modell anklicken und das zugehörige Maß eingeben."
+                               Margin="0,0,0,28"
+                               FontSize="12.5"
+                               Foreground="#77838F"
+                               TextWrapping="Wrap"/>
 
-                <TextBlock Text="Breite" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
-                <TextBox Margin="0,7,0,14" Height="36" Padding="10,7" Text="6000"/>
+                    <TextBlock Text="Gaubenform" Style="{StaticResource LabelStyle}"/>
+                    <ComboBox x:Name="DormerTypeCombo"
+                              Margin="0,7,0,24"
+                              SelectedIndex="0"
+                              SelectionChanged="DormerTypeCombo_SelectionChanged">
+                        <ComboBoxItem Content="Gaube ohne Giebel"/>
+                        <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
+                    </ComboBox>
 
-                <TextBlock Text="Höhe" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
-                <TextBox Margin="0,7,0,14" Height="36" Padding="10,7" Text="3000"/>
+                    <Border Background="#F5F7F9"
+                            BorderBrush="#DDE3E9"
+                            BorderThickness="1"
+                            CornerRadius="9"
+                            Padding="16"
+                            Margin="0,0,0,20">
+                        <StackPanel>
+                            <TextBlock Text="Ausgewählte Kante"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="#81909D"/>
 
-                <TextBlock Text="Plattenformat" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
-                <ComboBox Margin="0,7,0,18" Height="36" SelectedIndex="0">
-                    <ComboBoxItem Content="3050 × 1530 mm"/>
-                    <ComboBoxItem Content="2500 × 1250 mm"/>
-                    <ComboBoxItem Content="Eigene Platte"/>
-                </ComboBox>
+                            <TextBlock x:Name="SelectedDimensionTitle"
+                                       Text="Gaubenbreite"
+                                       Margin="0,4,0,3"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1D2B36"/>
 
-                <Button Content="Aufteilung erzeugen" Height="42" FontWeight="SemiBold"/>
-            </StackPanel>
+                            <TextBlock x:Name="SelectedDimensionHint"
+                                       Text="Vordere horizontale Kante"
+                                       Margin="0,0,0,13"
+                                       FontSize="12"
+                                       Foreground="#7B8792"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="48"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="DimensionValueBox"
+                                         Grid.Column="0"
+                                         Text="3000"
+                                         PreviewKeyDown="DimensionValueBox_PreviewKeyDown"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="mm"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="#6E7A86"/>
+                            </Grid>
+
+                            <Button Content="Maß übernehmen"
+                                    Margin="0,12,0,0"
+                                    Click="ApplyDimension_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Aktuelle Maße" Style="{StaticResource LabelStyle}"/>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition x:Name="GableRow" Height="0"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Breite" Foreground="#53616D"/>
+                        <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="3000 mm" FontWeight="SemiBold"/>
+
+                        <TextBlock Grid.Row="1" Text="Wandhöhe" Foreground="#53616D"/>
+                        <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="1600 mm" FontWeight="SemiBold"/>
+
+                        <TextBlock Grid.Row="2" Text="Tiefe" Foreground="#53616D"/>
+                        <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="1800 mm" FontWeight="SemiBold"/>
+
+                        <TextBlock x:Name="GableLabel" Grid.Row="3" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
+                        <TextBlock x:Name="GableValueText" Grid.Row="3" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
+                    </Grid>
+
+                    <Border Height="1" Background="#E3E7EB" Margin="0,24,0,18"/>
+
+                    <TextBlock Text="So bedienen"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="#697581"/>
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="12"
+                               LineHeight="19"
+                               Foreground="#78848F"
+                               TextWrapping="Wrap"
+                               Text="1. Gaubenform wählen&#10;2. Eine Linie im Modell anklicken&#10;3. Maß eingeben und übernehmen&#10;4. Modell aktualisiert sich sofort"/>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <Grid Grid.Column="1" Margin="24">
-            <Border Background="White" CornerRadius="10" BorderBrush="#D9DEE5" BorderThickness="1">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="3D-Ansicht"
-                               HorizontalAlignment="Center"
-                               FontSize="26"
-                               FontWeight="SemiBold"
-                               Foreground="#22303D"/>
-                    <TextBlock Text="Hier entsteht die Live-Visualisierung der Fassade."
-                               Margin="0,8,0,0"
-                               HorizontalAlignment="Center"
-                               FontSize="14"
-                               Foreground="#7A8592"/>
-                </StackPanel>
+            <Border Background="White"
+                    BorderBrush="#D8DEE5"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                <Grid>
+                    <Viewport3D x:Name="DormerViewport"
+                                Margin="8"
+                                ClipToBounds="True">
+                        <Viewport3D.Camera>
+                            <PerspectiveCamera x:Name="DormerCamera"
+                                               Position="5.2,3.8,6.8"
+                                               LookDirection="-5.2,-2.8,-6.8"
+                                               UpDirection="0,1,0"
+                                               FieldOfView="35"/>
+                        </Viewport3D.Camera>
+                    </Viewport3D>
+
+                    <Border HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="22"
+                            Padding="12,8"
+                            CornerRadius="7"
+                            Background="#EFFFFFFF"
+                            BorderBrush="#DCE2E8"
+                            BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="3D-Gaube"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="#243440"/>
+                            <TextBlock Text="Kante anklicken, um das Maß zu bearbeiten"
+                                       Margin="0,2,0,0"
+                                       FontSize="11.5"
+                                       Foreground="#788590"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="22"
+                            Padding="10,6"
+                            CornerRadius="6"
+                            Background="#F5F7F9"
+                            BorderBrush="#DCE2E8"
+                            BorderThickness="1">
+                        <TextBlock Text="Wireframe-Prototyp · Maße in mm"
+                                   FontSize="11"
+                                   Foreground="#7A8792"/>
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
     </Grid>
