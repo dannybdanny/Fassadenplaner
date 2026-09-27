@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,6 +25,7 @@ public partial class MainWindow : Window
     private string? _pendingDimensionKey;
 
     private readonly Dictionary<string, List<ModelUIElement3D>> _dimensionEdges = new();
+    private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
 
     private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(63, 77, 89));
     private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(24, 119, 173));
@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ViewportHost.SizeChanged += (_, _) => UpdateDimensionOverlay();
 
         Loaded += (_, _) =>
         {
@@ -96,6 +97,9 @@ public partial class MainWindow : Window
         ApplyRoofPitch();
         e.Handled = true;
     }
+
+    private void ApplyRoofPitch_Click(object sender, RoutedEventArgs e)
+        => ApplyRoofPitch();
 
     private void ApplyRoofPitch()
     {
@@ -204,6 +208,7 @@ public partial class MainWindow : Window
         }
 
         HighlightSelectedDimension();
+        UpdateDimensionOverlay();
         DimensionValueBox.Focus();
         DimensionValueBox.SelectAll();
     }
@@ -212,6 +217,7 @@ public partial class MainWindow : Window
     {
         DormerViewport.Children.Clear();
         _dimensionEdges.Clear();
+        _dimensionAnchors.Clear();
 
         var lights = new Model3DGroup();
         lights.Children.Add(new AmbientLight(Color.FromRgb(245, 245, 245)));
@@ -236,7 +242,7 @@ public partial class MainWindow : Window
         var topY = height;
         var backRoofY = topY;
 
-        AddMainRoofPlane(width, depth, scale);
+        AddMainRoofPlane(width, depth, gable, scale);
 
         var frontBottomLeft = new Point3D(x0, frontRoofY, zFront);
         var frontBottomRight = new Point3D(x1, frontRoofY, zFront);
@@ -246,46 +252,70 @@ public partial class MainWindow : Window
         var backIntersectionLeft = new Point3D(x0, backRoofY, zBack);
         var backIntersectionRight = new Point3D(x1, backRoofY, zBack);
 
-        // Deckende Gaubenflächen: Die Hauptdachtextur darf nicht durch die Gaube sichtbar sein.
-        AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush);
+        // Die Wangen sind deckend und laufen in die Hauptdachfläche.
         AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush);
         AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush);
 
-        if (!HasGable)
-        {
-            AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
-        }
-
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
-        AddEdge(frontTopLeft, frontTopRight, WidthKey);
         AddEdge(frontBottomLeft, frontTopLeft, HeightKey);
         AddEdge(frontBottomRight, frontTopRight, HeightKey);
 
-        // Unterkante folgt exakt der Hauptdachneigung.
-        AddPassiveEdge(frontBottomLeft, backIntersectionLeft, _normalBrush, 0.025);
-        AddPassiveEdge(frontBottomRight, backIntersectionRight, _normalBrush, 0.025);
+        // Auch die unteren Wangenkanten bleiben anklickbar.
+        AddEdge(frontBottomLeft, backIntersectionLeft, DepthKey);
+        AddEdge(frontBottomRight, backIntersectionRight, DepthKey);
 
-        // Flachdach-Oberkante waagerecht bis zum Schnittpunkt mit dem Hauptdach.
-        AddPassiveEdge(frontTopLeft, backIntersectionLeft, _normalBrush, 0.025);
-        AddPassiveEdge(frontTopRight, backIntersectionRight, _normalBrush, 0.025);
-        AddPassiveEdge(backIntersectionLeft, backIntersectionRight, _normalBrush, 0.025);
+        _dimensionAnchors[WidthKey] = MidPoint(frontBottomLeft, frontBottomRight);
+        _dimensionAnchors[HeightKey] = MidPoint(frontBottomLeft, frontTopLeft);
 
-        if (HasGable)
+        if (!HasGable)
+        {
+            // Flachdachgaube: rechteckige Front + waagerechte obere Fläche.
+            AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush);
+            AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
+
+            AddEdge(frontTopLeft, frontTopRight, WidthKey);
+            AddEdge(frontTopLeft, backIntersectionLeft, DepthKey);
+            AddEdge(frontTopRight, backIntersectionRight, DepthKey);
+            AddPassiveEdge(backIntersectionLeft, backIntersectionRight, _normalBrush, 0.010);
+
+            _dimensionAnchors[DepthKey] = MidPoint(frontTopLeft, backIntersectionLeft);
+        }
+        else
         {
             var frontApex = new Point3D(0, topY + gable, zFront);
-            var backCenter = new Point3D(0, topY, zBack);
 
-            AddTriangleSurface(frontTopLeft, frontApex, frontTopRight, _dormerFrontBrush);
-            AddTriangleSurface(frontTopLeft, backCenter, frontApex, _dormerTopBrush);
-            AddTriangleSurface(frontApex, backCenter, frontTopRight, _dormerTopBrush);
+            // Die Firstlinie läuft bis zum Schnittpunkt mit dem geneigten Hauptdach.
+            var pitchTan = Math.Tan(DegToRad(_roofPitchDeg));
+            var ridgeDepth = pitchTan > 0.0001 ? (topY + gable) / pitchTan : depth;
+            var zBackRidge = zFront - ridgeDepth;
+            var backRidge = new Point3D(0, topY + gable, zBackRidge);
 
+            // Gaubenfront als EIN zusammenhängendes Fünfeck inklusive Giebel.
+            AddGableFrontSurface(
+                frontBottomLeft,
+                frontBottomRight,
+                frontTopRight,
+                frontApex,
+                frontTopLeft,
+                _dormerFrontBrush);
+
+            // Beide Satteldachflächen reichen vollständig bis in die Hauptdachfläche.
+            AddQuadSurface(frontTopLeft, frontApex, backRidge, backIntersectionLeft, _dormerTopBrush);
+            AddQuadSurface(frontApex, frontTopRight, backIntersectionRight, backRidge, _dormerTopBrush);
+
+            // Front-Dachkanten, Traufkanten und First bleiben anklickbar/sichtbar.
             AddEdge(frontTopLeft, frontApex, GableKey);
             AddEdge(frontApex, frontTopRight, GableKey);
-            AddPassiveEdge(frontTopLeft, backCenter, _normalBrush, 0.025);
-            AddPassiveEdge(frontTopRight, backCenter, _normalBrush, 0.025);
-            AddPassiveEdge(frontApex, backCenter, _normalBrush, 0.025);
-        }
+            AddEdge(frontTopLeft, backIntersectionLeft, DepthKey);
+            AddEdge(frontTopRight, backIntersectionRight, DepthKey);
+            AddPassiveEdge(frontApex, backRidge, _normalBrush, 0.010);
+            AddPassiveEdge(backIntersectionLeft, backRidge, _normalBrush, 0.010);
+            AddPassiveEdge(backRidge, backIntersectionRight, _normalBrush, 0.010);
+            AddPassiveEdge(backIntersectionLeft, backIntersectionRight, _normalBrush, 0.010);
 
+            _dimensionAnchors[DepthKey] = MidPoint(frontTopLeft, backIntersectionLeft);
+            _dimensionAnchors[GableKey] = MidPoint(frontTopLeft, frontApex);
+        }
         var highestY = topY + (HasGable ? gable : 0);
 
         if (resetView)
@@ -299,13 +329,17 @@ public partial class MainWindow : Window
 
         UpdateCamera();
         HighlightSelectedDimension();
+        Dispatcher.BeginInvoke(UpdateDimensionOverlay);
     }
 
-    private void AddMainRoofPlane(double width, double depth, double scale)
+    private void AddMainRoofPlane(double width, double depth, double gable, double scale)
     {
         var extensionX = Math.Max(width * 0.75, 1.4);
         var extensionFront = Math.Max(depth * 0.55, 1.2);
-        var extensionBack = Math.Max(depth * 0.9, 1.8);
+
+        var pitchTan = Math.Tan(DegToRad(_roofPitchDeg));
+        var ridgeExtra = HasGable && pitchTan > 0.0001 ? gable / pitchTan : 0;
+        var extensionBack = Math.Max(depth * 0.9 + ridgeExtra, 1.8);
 
         var roofX0 = -width / 2 - extensionX;
         var roofX1 = width / 2 + extensionX;
@@ -315,7 +349,7 @@ public partial class MainWindow : Window
         double RoofY(double z)
         {
             var dz = depth / 2 - z;
-            return Math.Tan(DegToRad(_roofPitchDeg)) * dz;
+            return pitchTan * dz;
         }
 
         var p1 = new Point3D(roofX0, RoofY(roofZFront), roofZFront);
@@ -326,7 +360,7 @@ public partial class MainWindow : Window
         // Echte texturierte Hauptdachfläche.
         AddTexturedQuadSurface(p1, p2, p3, p4);
 
-        var roofLineRadius = Math.Max(0.012, 18 * scale);
+        var roofLineRadius = Math.Max(0.006, 9 * scale);
 
         AddPassiveEdge(p1, p2, _roofBrush, roofLineRadius);
         AddPassiveEdge(p2, p3, _roofBrush, roofLineRadius);
@@ -464,6 +498,7 @@ public partial class MainWindow : Window
         DormerCamera.Position = new Point3D(x, y, z);
         DormerCamera.LookDirection = _cameraTarget - DormerCamera.Position;
         DormerCamera.UpDirection = new Vector3D(0, 1, 0);
+        UpdateDimensionOverlay();
     }
 
 
@@ -548,16 +583,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            const string base64 =
-                "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCABgAFoDASIAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAAECAwb/xAAeEAACAgMBAQEBAAAAAAAAAAAAARExAhIhQSJRYf/EABcBAQEBAQAAAAAAAAAAAAAAAAABAgP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwDyzxUPnoeK/FZHtDqw9o8s5trqucQ1XOE+oVB7QqArxX54Hipoj2/lB7T4BXipoarakR7T4PrbwC6qaQWKmkT6nwLafAKsVNHNpS+G1tPhhvKXQHR5KH1WHkotWHiofFYeK/FYDZQuqw8lC6hqucQ1XOIeS51UHkptUHivxUHippUAeS2tDZbWg8VtSGq2pANltaCyUvqGqmkFipfEAWSm0YbUvqNrFTSMNKXwDT2h1Ye0eWVtQ+qw2otWBPqFQ+oVFlQuqw2oXUBHtyqD2nwra51UG1NqgI9p8H1t4VtbWhK2teAT6nwLafCytrQTWz6gItp8MPaXR0TU2vTDal9QH//Z";
-
-            var jpeg = Convert.FromBase64String(base64);
-
-            using var stream = new MemoryStream(jpeg);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = stream;
+            bitmap.UriSource = new Uri("pack://application:,,,/Assets/roof_tiles.jpg", UriKind.Absolute);
             bitmap.EndInit();
             bitmap.Freeze();
 
@@ -566,7 +595,7 @@ public partial class MainWindow : Window
                 Stretch = Stretch.Fill,
                 TileMode = TileMode.Tile,
                 ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
-                Viewport = new Rect(0, 0, 0.34, 0.34),
+                Viewport = new Rect(0, 0, 0.28, 0.28),
                 AlignmentX = AlignmentX.Left,
                 AlignmentY = AlignmentY.Top
             };
@@ -575,16 +604,146 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ein Texturfehler darf niemals den Programmstart verhindern.
-            var fallback = new SolidColorBrush(Color.FromRgb(82, 76, 68));
+            // Die App bleibt startfähig, selbst wenn eine Ressource beschädigt wäre.
+            var fallback = new SolidColorBrush(Color.FromRgb(120, 120, 120));
             fallback.Freeze();
             return fallback;
         }
     }
 
+    private static Point3D MidPoint(Point3D a, Point3D b)
+        => new((a.X + b.X) / 2.0, (a.Y + b.Y) / 2.0, (a.Z + b.Z) / 2.0);
+
+    private void AddGableFrontSurface(
+        Point3D bottomLeft,
+        Point3D bottomRight,
+        Point3D topRight,
+        Point3D apex,
+        Point3D topLeft,
+        Brush brush)
+    {
+        var mesh = new MeshGeometry3D();
+        mesh.Positions.Add(bottomLeft);   // 0
+        mesh.Positions.Add(bottomRight);  // 1
+        mesh.Positions.Add(topRight);     // 2
+        mesh.Positions.Add(apex);         // 3
+        mesh.Positions.Add(topLeft);      // 4
+
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(1);
+        mesh.TriangleIndices.Add(2);
+
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(4);
+
+        mesh.TriangleIndices.Add(4);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(3);
+
+        var material = new DiffuseMaterial(brush);
+        DormerViewport.Children.Add(new ModelVisual3D
+        {
+            Content = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            }
+        });
+    }
+
+    private void UpdateDimensionOverlay()
+    {
+        if (!IsLoaded || DimensionOverlay.ActualWidth <= 1 || DimensionOverlay.ActualHeight <= 1)
+            return;
+
+        DimensionOverlay.Children.Clear();
+
+        foreach (var pair in _dimensionAnchors)
+        {
+            var projected = ProjectToOverlay(pair.Value);
+            if (projected is null)
+                continue;
+
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(225, 255, 255, 255)),
+                BorderBrush = pair.Key == _selectedDimension
+                    ? new SolidColorBrush(Color.FromRgb(24, 119, 173))
+                    : new SolidColorBrush(Color.FromRgb(175, 184, 192)),
+                BorderThickness = new Thickness(pair.Key == _selectedDimension ? 1.5 : 1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(5, 2, 5, 2),
+                Child = new TextBlock
+                {
+                    Text = GetDimensionOverlayText(pair.Key),
+                    FontSize = 11.5,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(45, 57, 67))
+                }
+            };
+
+            border.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(border, projected.Value.X - border.DesiredSize.Width / 2);
+            Canvas.SetTop(border, projected.Value.Y - border.DesiredSize.Height / 2);
+            DimensionOverlay.Children.Add(border);
+        }
+    }
+
+    private string GetDimensionOverlayText(string key) => key switch
+    {
+        WidthKey => $"{_widthMm:0} mm",
+        HeightKey => $"{_frontWallHeightMm:0} mm",
+        DepthKey => $"{_depthMm:0} mm",
+        GableKey => $"{_gableHeightMm:0} mm",
+        _ => string.Empty
+    };
+
+    private Point? ProjectToOverlay(Point3D point)
+    {
+        var width = DimensionOverlay.ActualWidth;
+        var height = DimensionOverlay.ActualHeight;
+        if (width <= 1 || height <= 1)
+            return null;
+
+        var forward = DormerCamera.LookDirection;
+        if (forward.Length < 0.0001)
+            return null;
+        forward.Normalize();
+
+        var up = DormerCamera.UpDirection;
+        up.Normalize();
+
+        var right = Vector3D.CrossProduct(forward, up);
+        if (right.Length < 0.0001)
+            return null;
+        right.Normalize();
+
+        var trueUp = Vector3D.CrossProduct(right, forward);
+        trueUp.Normalize();
+
+        var relative = point - DormerCamera.Position;
+        var z = Vector3D.DotProduct(relative, forward);
+        if (z <= 0.01)
+            return null;
+
+        var tanHalfHorizontal = Math.Tan(DegToRad(DormerCamera.FieldOfView) / 2.0);
+        var aspect = width / height;
+        var tanHalfVertical = tanHalfHorizontal / Math.Max(aspect, 0.01);
+
+        var nx = Vector3D.DotProduct(relative, right) / (z * tanHalfHorizontal);
+        var ny = Vector3D.DotProduct(relative, trueUp) / (z * tanHalfVertical);
+
+        if (Math.Abs(nx) > 1.25 || Math.Abs(ny) > 1.25)
+            return null;
+
+        return new Point(
+            (nx + 1.0) * 0.5 * width,
+            (1.0 - ny) * 0.5 * height);
+    }
+
     private void AddEdge(Point3D start, Point3D end, string dimensionKey)
     {
-        var model = CreateLineModel(start, end, _normalBrush, 0.035);
+        var model = CreateLineModel(start, end, _normalBrush, 0.018);
         var element = new ModelUIElement3D { Model = model };
 
         element.MouseLeftButtonDown += (_, _) =>
