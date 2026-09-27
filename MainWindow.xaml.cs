@@ -787,8 +787,6 @@ public partial class MainWindow : Window
                 source.Freeze();
             }
 
-            // Wir erzeugen zuerst EIN fertiges lückenloses Bild.
-            // Das WPF-3D-Material muss danach selbst nichts mehr kacheln.
             var sourceWidth = Math.Max(1, source.PixelWidth);
             var sourceHeight = Math.Max(1, source.PixelHeight);
 
@@ -796,30 +794,35 @@ public partial class MainWindow : Window
                 ? roofWidth / roofSlopeLength
                 : 1.0;
 
-            // Zwei komplette Texturhöhen ergeben einen ruhigen,
-            // aber noch deutlich erkennbaren Ziegelmaßstab.
-            var targetHeight = Math.Clamp(sourceHeight * 2, 256, 1024);
-            var targetWidth = Math.Clamp(
-                (int)Math.Round(targetHeight * roofAspect),
-                256,
-                1536);
+            // Zielbitmap besteht ausschließlich aus GANZEN Texturkacheln.
+            // Dadurch können keine grauen Restflächen oder Zwischenstreifen entstehen.
+            var tilesY = 3;
+            var idealTilesX =
+                roofAspect * tilesY * sourceHeight / sourceWidth;
+
+            var tilesX = Math.Clamp(
+                (int)Math.Round(idealTilesX),
+                1,
+                12);
+
+            var targetWidth = sourceWidth * tilesX;
+            var targetHeight = sourceHeight * tilesY;
 
             var visual = new DrawingVisual();
 
             using (var dc = visual.RenderOpen())
             {
-                dc.DrawRectangle(
-                    new SolidColorBrush(Color.FromRgb(72, 67, 60)),
-                    null,
-                    new Rect(0, 0, targetWidth, targetHeight));
-
-                for (var y = 0; y < targetHeight; y += sourceHeight)
+                for (var row = 0; row < tilesY; row++)
                 {
-                    for (var x = 0; x < targetWidth; x += sourceWidth)
+                    for (var column = 0; column < tilesX; column++)
                     {
                         dc.DrawImage(
                             source,
-                            new Rect(x, y, sourceWidth, sourceHeight));
+                            new Rect(
+                                column * sourceWidth,
+                                row * sourceHeight,
+                                sourceWidth,
+                                sourceHeight));
                     }
                 }
             }
@@ -847,7 +850,6 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Nur als Notfall-Fallback; normal darf dieser Zweig nicht mehr sichtbar werden.
             var fallback = new SolidColorBrush(Color.FromRgb(105, 100, 94));
             fallback.Freeze();
             return fallback;
