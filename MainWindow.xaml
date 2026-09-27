@@ -53,26 +53,44 @@
                                FontWeight="SemiBold"
                                Foreground="#18212B"/>
 
-                    <TextBlock Text="Gaubenfläche erfassen"
+                    <TextBlock Text="Gaube geometrisch erfassen"
                                Margin="0,5,0,4"
                                FontSize="15"
                                FontWeight="SemiBold"
                                Foreground="#3A4956"/>
 
-                    <TextBlock Text="Gaube auswählen, Kante im 3D-Modell anklicken und das zugehörige Maß eingeben."
-                               Margin="0,0,0,28"
+                    <TextBlock Text="Die Gaube sitzt auf der geneigten Hauptdachfläche. Kante anklicken, Maß ändern und das Modell aktualisiert sich direkt."
+                               Margin="0,0,0,26"
                                FontSize="12.5"
                                Foreground="#77838F"
                                TextWrapping="Wrap"/>
 
                     <TextBlock Text="Gaubenform" Style="{StaticResource LabelStyle}"/>
                     <ComboBox x:Name="DormerTypeCombo"
-                              Margin="0,7,0,24"
+                              Margin="0,7,0,22"
                               SelectedIndex="0"
                               SelectionChanged="DormerTypeCombo_SelectionChanged">
                         <ComboBoxItem Content="Gaube ohne Giebel"/>
                         <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
                     </ComboBox>
+
+                    <TextBlock Text="Hauptdachneigung" Style="{StaticResource LabelStyle}"/>
+                    <Grid Margin="0,7,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="48"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="RoofPitchBox"
+                                 Grid.Column="0"
+                                 Text="35"
+                                 PreviewKeyDown="RoofPitchBox_PreviewKeyDown"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="°"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   FontSize="14"
+                                   Foreground="#6E7A86"/>
+                    </Grid>
 
                     <Border Background="#F5F7F9"
                             BorderBrush="#DDE3E9"
@@ -94,10 +112,11 @@
                                        Foreground="#1D2B36"/>
 
                             <TextBlock x:Name="SelectedDimensionHint"
-                                       Text="Vordere horizontale Kante"
+                                       Text="Horizontale Kante der Gaubenfront"
                                        Margin="0,0,0,13"
                                        FontSize="12"
-                                       Foreground="#7B8792"/>
+                                       Foreground="#7B8792"
+                                       TextWrapping="Wrap"/>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -132,25 +151,29 @@
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
                             <RowDefinition x:Name="GableRow" Height="0"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Text="Breite" Foreground="#53616D"/>
                         <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="3000 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="1" Text="Wandhöhe" Foreground="#53616D"/>
+                        <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#53616D"/>
                         <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="1600 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="2" Text="Tiefe" Foreground="#53616D"/>
+                        <TextBlock Grid.Row="2" Text="Gaubentiefe" Foreground="#53616D"/>
                         <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="1800 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock x:Name="GableLabel" Grid.Row="3" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
-                        <TextBlock x:Name="GableValueText" Grid.Row="3" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
+                        <TextBlock Grid.Row="3" Text="Hauptdachneigung" Foreground="#53616D"/>
+                        <TextBlock x:Name="PitchValueText" Grid.Row="3" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
+
+                        <TextBlock x:Name="GableLabel" Grid.Row="4" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
+                        <TextBlock x:Name="GableValueText" Grid.Row="4" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
                     </Grid>
 
                     <Border Height="1" Background="#E3E7EB" Margin="0,24,0,18"/>
 
-                    <TextBlock Text="So bedienen"
+                    <TextBlock Text="3D-Steuerung"
                                FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="#697581"/>
@@ -159,7 +182,7 @@
                                LineHeight="19"
                                Foreground="#78848F"
                                TextWrapping="Wrap"
-                               Text="1. Gaubenform wählen&#10;2. Eine Linie im Modell anklicken&#10;3. Maß eingeben und übernehmen&#10;4. Modell aktualisiert sich sofort"/>
+                               Text="Mausrad: zoomen&#10;Linke Maustaste halten + ziehen: rotieren&#10;Rechte Maustaste halten + ziehen: Ansicht verschieben&#10;Kurzer Linksklick auf Maßkante: Maß auswählen"/>
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -172,13 +195,19 @@
                 <Grid>
                     <Viewport3D x:Name="DormerViewport"
                                 Margin="8"
-                                ClipToBounds="True">
+                                ClipToBounds="True"
+                                MouseWheel="DormerViewport_MouseWheel"
+                                MouseLeftButtonDown="DormerViewport_MouseLeftButtonDown"
+                                MouseLeftButtonUp="DormerViewport_MouseLeftButtonUp"
+                                MouseRightButtonDown="DormerViewport_MouseRightButtonDown"
+                                MouseRightButtonUp="DormerViewport_MouseRightButtonUp"
+                                MouseMove="DormerViewport_MouseMove">
                         <Viewport3D.Camera>
                             <PerspectiveCamera x:Name="DormerCamera"
-                                               Position="5.2,3.8,6.8"
-                                               LookDirection="-5.2,-2.8,-6.8"
+                                               Position="8,5,10"
+                                               LookDirection="-8,-4,-10"
                                                UpDirection="0,1,0"
-                                               FieldOfView="35"/>
+                                               FieldOfView="34"/>
                         </Viewport3D.Camera>
                     </Viewport3D>
 
@@ -195,7 +224,7 @@
                                        FontSize="14"
                                        FontWeight="SemiBold"
                                        Foreground="#243440"/>
-                            <TextBlock Text="Kante anklicken, um das Maß zu bearbeiten"
+                            <TextBlock Text="Hauptdach + Gaube als Wireframe"
                                        Margin="0,2,0,0"
                                        FontSize="11.5"
                                        Foreground="#788590"/>
@@ -210,7 +239,7 @@
                             Background="#F5F7F9"
                             BorderBrush="#DCE2E8"
                             BorderThickness="1">
-                        <TextBlock Text="Wireframe-Prototyp · Maße in mm"
+                        <TextBlock Text="Rad: Zoom · Links: Orbit · Rechts: Verschieben"
                                    FontSize="11"
                                    Foreground="#7A8792"/>
                     </Border>
