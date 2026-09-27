@@ -1,9 +1,11 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Media.Imaging;
 
 namespace Fassadenplaner;
 
@@ -27,8 +29,11 @@ public partial class MainWindow : Window
 
     private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(63, 77, 89));
     private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(24, 119, 173));
-    private readonly Brush _roofBrush = new SolidColorBrush(Color.FromRgb(161, 173, 183));
+    private readonly Brush _roofBrush = new SolidColorBrush(Color.FromRgb(120, 126, 132));
     private readonly Brush _roofGridBrush = new SolidColorBrush(Color.FromRgb(218, 224, 229));
+    private readonly Brush _dormerFrontBrush = new SolidColorBrush(Color.FromRgb(232, 235, 238));
+    private readonly Brush _dormerSideBrush = new SolidColorBrush(Color.FromRgb(214, 220, 225));
+    private readonly Brush _dormerTopBrush = new SolidColorBrush(Color.FromRgb(199, 207, 214));
 
     private Point _mouseDownPosition;
     private Point _lastMousePosition;
@@ -241,6 +246,16 @@ public partial class MainWindow : Window
         var backIntersectionLeft = new Point3D(x0, backRoofY, zBack);
         var backIntersectionRight = new Point3D(x1, backRoofY, zBack);
 
+        // Deckende Gaubenflächen: Die Hauptdachtextur darf nicht durch die Gaube sichtbar sein.
+        AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush);
+        AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush);
+        AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush);
+
+        if (!HasGable)
+        {
+            AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
+        }
+
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
         AddEdge(frontTopLeft, frontTopRight, WidthKey);
         AddEdge(frontBottomLeft, frontTopLeft, HeightKey);
@@ -259,6 +274,10 @@ public partial class MainWindow : Window
         {
             var frontApex = new Point3D(0, topY + gable, zFront);
             var backCenter = new Point3D(0, topY, zBack);
+
+            AddTriangleSurface(frontTopLeft, frontApex, frontTopRight, _dormerFrontBrush);
+            AddTriangleSurface(frontTopLeft, backCenter, frontApex, _dormerTopBrush);
+            AddTriangleSurface(frontApex, backCenter, frontTopRight, _dormerTopBrush);
 
             AddEdge(frontTopLeft, frontApex, GableKey);
             AddEdge(frontApex, frontTopRight, GableKey);
@@ -304,6 +323,9 @@ public partial class MainWindow : Window
         var p3 = new Point3D(roofX1, RoofY(roofZBack), roofZBack);
         var p4 = new Point3D(roofX0, RoofY(roofZBack), roofZBack);
 
+        // Echte texturierte Hauptdachfläche.
+        AddTexturedQuadSurface(p1, p2, p3, p4);
+
         var roofLineRadius = Math.Max(0.012, 18 * scale);
 
         AddPassiveEdge(p1, p2, _roofBrush, roofLineRadius);
@@ -311,17 +333,6 @@ public partial class MainWindow : Window
         AddPassiveEdge(p3, p4, _roofBrush, roofLineRadius);
         AddPassiveEdge(p4, p1, _roofBrush, roofLineRadius);
 
-        for (var i = 1; i <= 5; i++)
-        {
-            var t = i / 6.0;
-            var z = roofZFront + (roofZBack - roofZFront) * t;
-
-            AddPassiveEdge(
-                new Point3D(roofX0, RoofY(z), z),
-                new Point3D(roofX1, RoofY(z), z),
-                _roofGridBrush,
-                Math.Max(0.008, 10 * scale));
-        }
     }
 
     private double ComputeScale()
@@ -453,6 +464,114 @@ public partial class MainWindow : Window
         DormerCamera.Position = new Point3D(x, y, z);
         DormerCamera.LookDirection = _cameraTarget - DormerCamera.Position;
         DormerCamera.UpDirection = new Vector3D(0, 1, 0);
+    }
+
+
+    private void AddTriangleSurface(Point3D p1, Point3D p2, Point3D p3, Brush brush)
+    {
+        var mesh = new MeshGeometry3D();
+        mesh.Positions.Add(p1);
+        mesh.Positions.Add(p2);
+        mesh.Positions.Add(p3);
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(1);
+        mesh.TriangleIndices.Add(2);
+
+        var material = new DiffuseMaterial(brush);
+        DormerViewport.Children.Add(new ModelVisual3D
+        {
+            Content = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            }
+        });
+    }
+
+    private void AddQuadSurface(Point3D p1, Point3D p2, Point3D p3, Point3D p4, Brush brush)
+    {
+        var mesh = new MeshGeometry3D();
+        mesh.Positions.Add(p1);
+        mesh.Positions.Add(p2);
+        mesh.Positions.Add(p3);
+        mesh.Positions.Add(p4);
+
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(1);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(3);
+
+        var material = new DiffuseMaterial(brush);
+        DormerViewport.Children.Add(new ModelVisual3D
+        {
+            Content = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            }
+        });
+    }
+
+    private void AddTexturedQuadSurface(Point3D p1, Point3D p2, Point3D p3, Point3D p4)
+    {
+        var mesh = new MeshGeometry3D();
+        mesh.Positions.Add(p1);
+        mesh.Positions.Add(p2);
+        mesh.Positions.Add(p3);
+        mesh.Positions.Add(p4);
+
+        mesh.TextureCoordinates.Add(new Point(0, 1));
+        mesh.TextureCoordinates.Add(new Point(1, 1));
+        mesh.TextureCoordinates.Add(new Point(1, 0));
+        mesh.TextureCoordinates.Add(new Point(0, 0));
+
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(1);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(0);
+        mesh.TriangleIndices.Add(2);
+        mesh.TriangleIndices.Add(3);
+
+        var textureBrush = CreateRoofTextureBrush();
+        var material = new DiffuseMaterial(textureBrush);
+
+        DormerViewport.Children.Add(new ModelVisual3D
+        {
+            Content = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            }
+        });
+    }
+
+    private static ImageBrush CreateRoofTextureBrush()
+    {
+        // Kleine eingebettete Vorschau der vom Nutzer gelieferten Ziegeltextur.
+        // Damit bleibt der Windows-Build vollständig standalone.
+        byte[] jpeg =
+        {
+255,216,255,224,0,16,74,70,73,70,0,1,1,0,0,1,0,1,0,0,255,219,0,67,0,18,12,13,16,13,11,18,16,14,16,20,19,18,21,27,44,29,27,24,24,27,54,39,41,32,44,64,57,68,67,63,57,62,61,71,80,102,87,71,75,97,77,61,62,89,121,90,97,105,109,114,115,114,69,85,125,134,124,111,133,102,112,114,110,255,219,0,67,1,19,20,20,27,23,27,52,29,29,52,110,73,62,73,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,110,255,192,0,17,8,0,96,0,90,3,1,34,0,2,17,1,3,17,1,255,196,0,24,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,3,2,5,255,196,0,30,16,0,3,0,2,3,1,1,1,0,0,0,0,0,0,0,0,0,1,17,33,49,18,34,65,81,97,161,255,196,0,22,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,255,196,0,20,17,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,218,0,12,3,1,0,2,17,3,17,0,63,0,240,154,89,17,127,72,249,71,161,218,121,179,13,44,88,36,88,29,177,161,218,45,0,105,21,165,72,249,126,7,202,248,5,138,136,169,31,43,224,237,124,2,197,73,21,29,175,131,181,240,10,146,51,107,44,237,114,190,28,54,235,209,70,141,168,242,27,83,126,134,148,120,13,47,158,144,42,198,73,84,89,44,88,193,34,198,0,54,190,149,181,118,70,151,192,210,186,2,182,174,208,170,236,69,116,72,174,128,181,93,160,154,187,36,87,66,43,160,42,106,236,205,181,94,77,18,95,12,218,203,192,29,190,81,232,118,252,217,91,81,228,85,55,232,19,182,52,59,69,162,213,22,73,84,89,0,249,126,7,202,248,27,95,74,218,187,2,62,87,193,218,248,86,213,218,21,93,129,59,95,7,107,225,106,187,66,171,176,34,229,124,56,109,215,163,68,213,217,155,106,188,129,163,75,56,17,124,244,143,148,122,29,191,54,2,44,96,69,140,14,216,208,237,22,128,52,190,21,165,116,71,203,240,62,87,192,17,93,8,174,131,229,124,29,175,128,34,186,17,93,14,215,193,218,248,5,73,124,51,107,44,237,114,190,28,54,235,209,70,141,168,242,133,83,126,134,148,120,13,47,158,144,42,198,73,84,89,17,99,2,44,96,3,107,233,91,87,100,105,124,43,74,232,3,106,236,85,118,34,186,36,87,64,90,174,208,77,93,146,43,160,146,186,2,166,174,204,219,85,228,209,37,240,205,172,188,1,219,229,30,135,111,205,149,181,30,67,106,111,208,39,108,104,118,139,69,170,44,146,168,178,1,242,252,15,149,240,173,175,161,181,118,4,124,175,131,181,240,173,171,177,85,216,19,181,240,118,190,22,171,176,154,187,2,46,87,195,134,221,122,52,77,93,153,185,94,64,255,217
+        };
+
+        using var stream = new MemoryStream(jpeg);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+
+        var brush = new ImageBrush(bitmap)
+        {
+            Stretch = Stretch.Fill,
+            TileMode = TileMode.Tile,
+            ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
+            Viewport = new Rect(0, 0, 0.42, 0.42),
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top
+        };
+        brush.Freeze();
+        return brush;
     }
 
     private void AddEdge(Point3D start, Point3D end, string dimensionKey)
