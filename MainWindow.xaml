@@ -132,10 +132,10 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="DimensionValueBox"
                                          Grid.Column="0"
-                                         Text="3000"
+                                         Text="300"
                                          PreviewKeyDown="DimensionValueBox_PreviewKeyDown"/>
                                 <TextBlock Grid.Column="1"
-                                           Text="mm"
+                                           Text="cm"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center"
                                            FontSize="13"
@@ -164,22 +164,22 @@
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Text="Breite" Foreground="#53616D"/>
-                        <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="3000 mm" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="300 cm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#53616D"/>
-                        <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="1600 mm" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="160 cm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="2" Text="Gaubentiefe waagerecht" Foreground="#53616D"/>
-                        <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="2285 mm" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="228,5 cm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="3" Text="Untere Wangenlänge" Foreground="#53616D"/>
-                        <TextBlock x:Name="SlopeValueText" Grid.Row="3" Grid.Column="1" Text="2790 mm" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="SlopeValueText" Grid.Row="3" Grid.Column="1" Text="279 cm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="4" Text="Hauptdachneigung" Foreground="#53616D"/>
                         <TextBlock x:Name="PitchValueText" Grid.Row="4" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
 
                         <TextBlock x:Name="GableLabel" Grid.Row="5" Text="Giebelhöhe" Foreground="#53616D" Visibility="Collapsed"/>
-                        <TextBlock x:Name="GableValueText" Grid.Row="5" Grid.Column="1" Text="800 mm" FontWeight="SemiBold" Visibility="Collapsed"/>
+                        <TextBlock x:Name="GableValueText" Grid.Row="5" Grid.Column="1" Text="80 cm" FontWeight="SemiBold" Visibility="Collapsed"/>
                     </Grid>
 
                     <TextBlock Margin="0,8,0,0"
