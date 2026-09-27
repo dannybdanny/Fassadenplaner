@@ -1,0 +1,71 @@
+<Window x:Class="Fassadenplaner.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Fassadenplaner"
+        Width="1280"
+        Height="800"
+        MinWidth="1000"
+        MinHeight="650"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F5F7">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="White"
+                BorderBrush="#D9DEE5"
+                BorderThickness="0,0,1,0"
+                Padding="24">
+            <StackPanel>
+                <TextBlock Text="Fassadenplaner"
+                           FontSize="28"
+                           FontWeight="SemiBold"
+                           Foreground="#18212B"/>
+
+                <TextBlock Text="3D-Plattenplanung für Fassade und Bekleidung"
+                           Margin="0,6,0,28"
+                           FontSize="13"
+                           Foreground="#65707D"
+                           TextWrapping="Wrap"/>
+
+                <TextBlock Text="Projekt" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
+                <TextBox Margin="0,7,0,18" Height="36" Padding="10,7" Text="Neues Projekt"/>
+
+                <TextBlock Text="Breite" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
+                <TextBox Margin="0,7,0,14" Height="36" Padding="10,7" Text="6000"/>
+
+                <TextBlock Text="Höhe" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
+                <TextBox Margin="0,7,0,14" Height="36" Padding="10,7" Text="3000"/>
+
+                <TextBlock Text="Plattenformat" FontSize="12" FontWeight="SemiBold" Foreground="#65707D"/>
+                <ComboBox Margin="0,7,0,18" Height="36" SelectedIndex="0">
+                    <ComboBoxItem Content="3050 × 1530 mm"/>
+                    <ComboBoxItem Content="2500 × 1250 mm"/>
+                    <ComboBoxItem Content="Eigene Platte"/>
+                </ComboBox>
+
+                <Button Content="Aufteilung erzeugen" Height="42" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="24">
+            <Border Background="White" CornerRadius="10" BorderBrush="#D9DEE5" BorderThickness="1">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="3D-Ansicht"
+                               HorizontalAlignment="Center"
+                               FontSize="26"
+                               FontWeight="SemiBold"
+                               Foreground="#22303D"/>
+                    <TextBlock Text="Hier entsteht die Live-Visualisierung der Fassade."
+                               Margin="0,8,0,0"
+                               HorizontalAlignment="Center"
+                               FontSize="14"
+                               Foreground="#7A8592"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
