@@ -7,6 +7,7 @@
         MinWidth="1100"
         MinHeight="700"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
         Background="#F3F5F7">
     <Window.Resources>
         <Style x:Key="LabelStyle" TargetType="TextBlock">
@@ -59,7 +60,7 @@
                                FontWeight="SemiBold"
                                Foreground="#3A4956"/>
 
-                    <TextBlock Text="Die Gaube schneidet in die geneigte Hauptdachfläche ein. Hinten läuft die Wange standardmäßig auf Höhe null aus."
+                    <TextBlock Text="Die Flachdachgaube startet mit waagerechter Oberkante. Die Wangen laufen als rechtwinklige Dreiecke in die geneigte Hauptdachfläche."
                                Margin="0,0,0,26"
                                FontSize="12.5"
                                Foreground="#77838F"
@@ -70,7 +71,7 @@
                               Margin="0,7,0,22"
                               SelectedIndex="0"
                               SelectionChanged="DormerTypeCombo_SelectionChanged">
-                        <ComboBoxItem Content="Gaube ohne Giebel"/>
+                        <ComboBoxItem Content="Flachdachgaube"/>
                         <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
                     </ComboBox>
 
@@ -161,7 +162,7 @@
                         <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#53616D"/>
                         <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="1600 mm" FontWeight="SemiBold"/>
 
-                        <TextBlock Grid.Row="2" Text="Gaubentiefe" Foreground="#53616D"/>
+                        <TextBlock Grid.Row="2" Text="Einbindetiefe (berechnet)" Foreground="#53616D"/>
                         <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="1800 mm" FontWeight="SemiBold"/>
 
                         <TextBlock Grid.Row="3" Text="Hauptdachneigung" Foreground="#53616D"/>
