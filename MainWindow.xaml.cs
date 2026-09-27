@@ -1057,10 +1057,10 @@ public partial class MainWindow : Window
         SurfaceDetailAreaText.Text =
             $"Fläche: {areaM2.ToString("0.00", GermanCulture)} m²";
 
-        const double left = 50;
-        const double top = 22;
-        const double maxWidth = 220;
-        const double maxHeight = 175;
+        const double left = 42;
+        const double top = 14;
+        const double maxWidth = 182;
+        const double maxHeight = 128;
 
         var totalHeightMm = wallHeightMm + gableMm;
         var scale = Math.Min(
@@ -1130,10 +1130,10 @@ public partial class MainWindow : Window
         SurfaceDetailAreaText.Text =
             $"Fläche: {areaM2.ToString("0.00", GermanCulture)} m²";
 
-        const double left = 55;
-        const double top = 18;
-        const double maxWidth = 205;
-        const double maxHeight = 175;
+        const double left = 46;
+        const double top = 14;
+        const double maxWidth = 174;
+        const double maxHeight = 126;
 
         var maxVerticalMm = Math.Max(backRiseMm, _frontWallHeightMm);
         var scale = Math.Min(
