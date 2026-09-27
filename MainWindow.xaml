@@ -59,7 +59,7 @@
                                FontWeight="SemiBold"
                                Foreground="#3A4956"/>
 
-                    <TextBlock Text="Die Gaube sitzt auf der geneigten Hauptdachfläche. Kante anklicken, Maß ändern und das Modell aktualisiert sich direkt."
+                    <TextBlock Text="Die Gaube schneidet in die geneigte Hauptdachfläche ein. Hinten läuft die Wange standardmäßig auf Höhe null aus."
                                Margin="0,0,0,26"
                                FontSize="12.5"
                                Foreground="#77838F"
@@ -182,7 +182,7 @@
                                LineHeight="19"
                                Foreground="#78848F"
                                TextWrapping="Wrap"
-                               Text="Mausrad: zoomen&#10;Linke Maustaste halten + ziehen: rotieren&#10;Rechte Maustaste halten + ziehen: Ansicht verschieben&#10;Kurzer Linksklick auf Maßkante: Maß auswählen"/>
+                               Text="Mausrad: zoomen – überall im Ansichtsfenster&#10;Linke Maustaste halten + ziehen: rotieren&#10;Rechte Maustaste halten + ziehen: Ansicht verschieben&#10;Kurzer Linksklick auf Maßkante: Maß auswählen"/>
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -192,16 +192,17 @@
                     BorderBrush="#D8DEE5"
                     BorderThickness="1"
                     CornerRadius="12">
-                <Grid>
+                <Grid x:Name="ViewportHost"
+                      Background="Transparent"
+                      PreviewMouseWheel="ViewportHost_PreviewMouseWheel"
+                      PreviewMouseLeftButtonDown="ViewportHost_PreviewMouseLeftButtonDown"
+                      PreviewMouseLeftButtonUp="ViewportHost_PreviewMouseLeftButtonUp"
+                      PreviewMouseRightButtonDown="ViewportHost_PreviewMouseRightButtonDown"
+                      PreviewMouseRightButtonUp="ViewportHost_PreviewMouseRightButtonUp"
+                      PreviewMouseMove="ViewportHost_PreviewMouseMove">
                     <Viewport3D x:Name="DormerViewport"
                                 Margin="8"
-                                ClipToBounds="True"
-                                MouseWheel="DormerViewport_MouseWheel"
-                                MouseLeftButtonDown="DormerViewport_MouseLeftButtonDown"
-                                MouseLeftButtonUp="DormerViewport_MouseLeftButtonUp"
-                                MouseRightButtonDown="DormerViewport_MouseRightButtonDown"
-                                MouseRightButtonUp="DormerViewport_MouseRightButtonUp"
-                                MouseMove="DormerViewport_MouseMove">
+                                ClipToBounds="True">
                         <Viewport3D.Camera>
                             <PerspectiveCamera x:Name="DormerCamera"
                                                Position="8,5,10"
