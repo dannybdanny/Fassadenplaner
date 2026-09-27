@@ -1,0 +1,107 @@
+name: Windows Installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-installer:
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup local .NET 10 SDK
+        shell: powershell
+        run: |
+          $dotnetDir = "C:\\Fassadenplaner\\dotnet"
+          $dotnetExe = Join-Path $dotnetDir "dotnet.exe"
+
+          if (-not (Test-Path $dotnetExe)) {
+            New-Item -ItemType Directory -Force -Path $dotnetDir | Out-Null
+            $installScript = Join-Path $env:RUNNER_TEMP "dotnet-install.ps1"
+            Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile $installScript
+            & $installScript -Channel 10.0 -InstallDir $dotnetDir -NoPath
+          }
+
+          if (-not (Test-Path $dotnetExe)) {
+            throw ".NET 10 SDK konnte nicht lokal installiert werden."
+          }
+
+          "DOTNET_ROOT=$dotnetDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $dotnetDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $dotnetExe --info
+
+      - name: Restore
+        run: dotnet restore Fassadenplaner.csproj
+
+      - name: Build
+        run: dotnet build Fassadenplaner.csproj -c Release --no-restore
+
+      - name: Publish standalone Windows app
+        run: >
+          dotnet publish Fassadenplaner.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/Fassadenplaner-win-x64
+
+      - name: Find or install Inno Setup
+        shell: powershell
+        run: |
+          $iscc = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+
+          if (-not (Test-Path $iscc)) {
+            if (Get-Command choco -ErrorAction SilentlyContinue) {
+              choco install innosetup --no-progress -y
+            }
+          }
+
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup 6 fehlt. Bitte einmal Inno Setup installieren und den Workflow erneut starten."
+          }
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          $version = "0.1.${{ github.run_number }}"
+          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" "/DMyAppVersion=$version" "installer\\Fassadenplaner.iss"
+
+      - name: Copy installer to local Fassadenplaner build folder
+        shell: powershell
+        run: |
+          $target = "C:\\Fassadenplaner\\Builds"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+
+          $installer = Get-ChildItem "publish\\installer\\*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $installer) {
+            throw "Installer wurde nicht gefunden."
+          }
+
+          $versionedName = "Fassadenplaner-Setup-${{ github.run_number }}-win-x64.exe"
+          $versionedPath = Join-Path $target $versionedName
+          Copy-Item $installer.FullName $versionedPath -Force
+
+          $latestPath = Join-Path $target "Fassadenplaner-Setup-LATEST.exe"
+          Copy-Item $installer.FullName $latestPath -Force
+
+          $codeCommit = git rev-parse HEAD
+
+          @"
+          Fassadenplaner Local Build
+          GitHub Run: ${{ github.run_number }}
+          Branch: main
+          Commit: $codeCommit
+          Built: $(Get-Date -Format "dd.MM.yyyy HH:mm:ss")
+          Installer: $versionedPath
+          "@ | Set-Content (Join-Path $target "LATEST.txt") -Encoding UTF8
+
+          Write-Host ""
+          Write-Host "Fertig:"
+          Write-Host $versionedPath
+          Write-Host $latestPath
