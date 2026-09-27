@@ -235,39 +235,36 @@ public partial class MainWindow : Window
 
         var backBottomLeft = new Point3D(x0, backRoofY, zBack);
         var backBottomRight = new Point3D(x1, backRoofY, zBack);
-        var backTopLeft = new Point3D(x0, eaveY, zBack);
-        var backTopRight = new Point3D(x1, eaveY, zBack);
+
+        // Standardgeometrie: Die Gaube läuft hinten direkt in die Hauptdachfläche.
+        // Es gibt dort keine zusätzliche senkrechte Rückwand.
+        var backIntersectionLeft = backBottomLeft;
+        var backIntersectionRight = backBottomRight;
 
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
         AddEdge(frontTopLeft, frontTopRight, WidthKey);
         AddEdge(frontBottomLeft, frontTopLeft, HeightKey);
         AddEdge(frontBottomRight, frontTopRight, HeightKey);
-        AddEdge(frontBottomLeft, backBottomLeft, DepthKey);
-        AddEdge(frontBottomRight, backBottomRight, DepthKey);
+        AddEdge(frontBottomLeft, backIntersectionLeft, DepthKey);
+        AddEdge(frontBottomRight, backIntersectionRight, DepthKey);
 
-        AddPassiveEdge(backBottomLeft, backBottomRight, _normalBrush, 0.025);
-        AddPassiveEdge(backBottomLeft, backTopLeft, _normalBrush, 0.025);
-        AddPassiveEdge(backBottomRight, backTopRight, _normalBrush, 0.025);
+        // Dreieckige Gaubenwangen.
+        AddPassiveEdge(frontTopLeft, backIntersectionLeft, _normalBrush, 0.025);
+        AddPassiveEdge(frontTopRight, backIntersectionRight, _normalBrush, 0.025);
+        AddPassiveEdge(backIntersectionLeft, backIntersectionRight, _normalBrush, 0.025);
 
         if (HasGable)
         {
             var frontApex = new Point3D(0, eaveY + gable, zFront);
-            var backApex = new Point3D(0, eaveY + gable, zBack);
+            var backCenter = new Point3D(0, backRoofY, zBack);
 
             AddEdge(frontTopLeft, frontApex, GableKey);
             AddEdge(frontApex, frontTopRight, GableKey);
 
-            AddPassiveEdge(backTopLeft, backApex, _normalBrush, 0.025);
-            AddPassiveEdge(backApex, backTopRight, _normalBrush, 0.025);
-            AddPassiveEdge(frontApex, backApex, _normalBrush, 0.025);
-            AddPassiveEdge(frontTopLeft, backTopLeft, _normalBrush, 0.025);
-            AddPassiveEdge(frontTopRight, backTopRight, _normalBrush, 0.025);
-        }
-        else
-        {
-            AddPassiveEdge(frontTopLeft, backTopLeft, _normalBrush, 0.025);
-            AddPassiveEdge(frontTopRight, backTopRight, _normalBrush, 0.025);
-            AddPassiveEdge(backTopLeft, backTopRight, _normalBrush, 0.025);
+            // Die beiden Gaubendachflächen laufen hinten ebenfalls in der Hauptdachfläche aus.
+            AddPassiveEdge(frontTopLeft, backCenter, _normalBrush, 0.025);
+            AddPassiveEdge(frontTopRight, backCenter, _normalBrush, 0.025);
+            AddPassiveEdge(frontApex, backCenter, _normalBrush, 0.025);
         }
 
         var highestY = Math.Max(backRoofY, eaveY + (HasGable ? gable : 0));
@@ -338,7 +335,7 @@ public partial class MainWindow : Window
         return 3.5 / Math.Max(maxMm, 1);
     }
 
-    private void DormerViewport_MouseWheel(object sender, MouseWheelEventArgs e)
+    private void ViewportHost_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         var factor = e.Delta > 0 ? 0.88 : 1.14;
         _cameraDistance *= factor;
@@ -347,16 +344,16 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void DormerViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void ViewportHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _isOrbiting = true;
         _leftDragExceededThreshold = false;
-        _mouseDownPosition = e.GetPosition(DormerViewport);
+        _mouseDownPosition = e.GetPosition(ViewportHost);
         _lastMousePosition = _mouseDownPosition;
-        DormerViewport.CaptureMouse();
+        ViewportHost.CaptureMouse();
     }
 
-    private void DormerViewport_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void ViewportHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_leftDragExceededThreshold && _pendingDimensionKey is not null)
             SelectDimension(_pendingDimensionKey);
@@ -365,30 +362,27 @@ public partial class MainWindow : Window
         _isOrbiting = false;
 
         if (!_isPanning)
-            DormerViewport.ReleaseMouseCapture();
+            ViewportHost.ReleaseMouseCapture();
     }
 
-    private void DormerViewport_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    private void ViewportHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         _isPanning = true;
-        _lastMousePosition = e.GetPosition(DormerViewport);
-        DormerViewport.CaptureMouse();
-        e.Handled = true;
+        _lastMousePosition = e.GetPosition(ViewportHost);
+        ViewportHost.CaptureMouse();
     }
 
-    private void DormerViewport_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    private void ViewportHost_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
         _isPanning = false;
 
         if (!_isOrbiting)
-            DormerViewport.ReleaseMouseCapture();
-
-        e.Handled = true;
+            ViewportHost.ReleaseMouseCapture();
     }
 
-    private void DormerViewport_MouseMove(object sender, MouseEventArgs e)
+    private void ViewportHost_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        var current = e.GetPosition(DormerViewport);
+        var current = e.GetPosition(ViewportHost);
         var delta = current - _lastMousePosition;
 
         if (_isOrbiting && e.LeftButton == MouseButtonState.Pressed)
@@ -399,7 +393,7 @@ public partial class MainWindow : Window
 
             if (_leftDragExceededThreshold)
             {
-                _cameraYawDeg += delta.X * 0.34;
+                _cameraYawDeg -= delta.X * 0.34;
                 _cameraPitchDeg -= delta.Y * 0.28;
                 _cameraPitchDeg = Math.Clamp(_cameraPitchDeg, -12, 82);
                 UpdateCamera();
