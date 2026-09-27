@@ -16,7 +16,7 @@ public partial class MainWindow : Window
 
     private double _widthMm = 3000;
     private double _frontWallHeightMm = 1600;
-    private double _depthMm = 1800;
+    private double _depthMm = 0;
     private double _gableHeightMm = 800;
     private double _roofPitchDeg = 35;
 
@@ -141,8 +141,11 @@ public partial class MainWindow : Window
                 _frontWallHeightMm = value;
                 break;
             case DepthKey:
-                _depthMm = value;
-                break;
+                MessageBox.Show("Die Einbindetiefe wird bei der Flachdachgaube automatisch aus Wandhöhe und Hauptdachneigung berechnet.",
+                    "Berechnetes Maß",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
             case GableKey:
                 _gableHeightMm = value;
                 break;
@@ -155,6 +158,7 @@ public partial class MainWindow : Window
 
     private void RefreshDimensionSummary()
     {
+        _depthMm = CalculateDormerDepthMm();
         WidthValueText.Text = FormatMillimeters(_widthMm);
         HeightValueText.Text = FormatMillimeters(_frontWallHeightMm);
         DepthValueText.Text = FormatMillimeters(_depthMm);
@@ -183,8 +187,8 @@ public partial class MainWindow : Window
                 DimensionValueBox.Text = _frontWallHeightMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
             case DepthKey:
-                SelectedDimensionTitle.Text = "Gaubentiefe";
-                SelectedDimensionHint.Text = "Tiefe der Gaube entlang der Hauptdachfläche";
+                SelectedDimensionTitle.Text = "Einbindetiefe";
+                SelectedDimensionHint.Text = "Wird automatisch aus Wandhöhe und Hauptdachneigung berechnet";
                 DimensionValueBox.Text = _depthMm.ToString("0", CultureInfo.InvariantCulture);
                 break;
             case GableKey:
@@ -211,11 +215,12 @@ public partial class MainWindow : Window
 
         var scale = ComputeScale();
 
+        _depthMm = CalculateDormerDepthMm();
+
         var width = _widthMm * scale;
         var height = _frontWallHeightMm * scale;
         var depth = _depthMm * scale;
         var gable = _gableHeightMm * scale;
-        var roofRise = Math.Tan(DegToRad(_roofPitchDeg)) * depth;
 
         var x0 = -width / 2.0;
         var x1 = width / 2.0;
@@ -223,51 +228,46 @@ public partial class MainWindow : Window
         var zBack = -depth / 2.0;
 
         var frontRoofY = 0.0;
-        var backRoofY = roofRise;
-        var eaveY = frontRoofY + height;
+        var topY = height;
+        var backRoofY = topY;
 
         AddMainRoofPlane(width, depth, scale);
 
         var frontBottomLeft = new Point3D(x0, frontRoofY, zFront);
         var frontBottomRight = new Point3D(x1, frontRoofY, zFront);
-        var frontTopLeft = new Point3D(x0, eaveY, zFront);
-        var frontTopRight = new Point3D(x1, eaveY, zFront);
+        var frontTopLeft = new Point3D(x0, topY, zFront);
+        var frontTopRight = new Point3D(x1, topY, zFront);
 
-        var backBottomLeft = new Point3D(x0, backRoofY, zBack);
-        var backBottomRight = new Point3D(x1, backRoofY, zBack);
-
-        // Standardgeometrie: Die Gaube läuft hinten direkt in die Hauptdachfläche.
-        // Es gibt dort keine zusätzliche senkrechte Rückwand.
-        var backIntersectionLeft = backBottomLeft;
-        var backIntersectionRight = backBottomRight;
+        var backIntersectionLeft = new Point3D(x0, backRoofY, zBack);
+        var backIntersectionRight = new Point3D(x1, backRoofY, zBack);
 
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
         AddEdge(frontTopLeft, frontTopRight, WidthKey);
         AddEdge(frontBottomLeft, frontTopLeft, HeightKey);
         AddEdge(frontBottomRight, frontTopRight, HeightKey);
-        AddEdge(frontBottomLeft, backIntersectionLeft, DepthKey);
-        AddEdge(frontBottomRight, backIntersectionRight, DepthKey);
 
-        // Dreieckige Gaubenwangen.
+        // Unterkante folgt exakt der Hauptdachneigung.
+        AddPassiveEdge(frontBottomLeft, backIntersectionLeft, _normalBrush, 0.025);
+        AddPassiveEdge(frontBottomRight, backIntersectionRight, _normalBrush, 0.025);
+
+        // Flachdach-Oberkante waagerecht bis zum Schnittpunkt mit dem Hauptdach.
         AddPassiveEdge(frontTopLeft, backIntersectionLeft, _normalBrush, 0.025);
         AddPassiveEdge(frontTopRight, backIntersectionRight, _normalBrush, 0.025);
         AddPassiveEdge(backIntersectionLeft, backIntersectionRight, _normalBrush, 0.025);
 
         if (HasGable)
         {
-            var frontApex = new Point3D(0, eaveY + gable, zFront);
-            var backCenter = new Point3D(0, backRoofY, zBack);
+            var frontApex = new Point3D(0, topY + gable, zFront);
+            var backCenter = new Point3D(0, topY, zBack);
 
             AddEdge(frontTopLeft, frontApex, GableKey);
             AddEdge(frontApex, frontTopRight, GableKey);
-
-            // Die beiden Gaubendachflächen laufen hinten ebenfalls in der Hauptdachfläche aus.
             AddPassiveEdge(frontTopLeft, backCenter, _normalBrush, 0.025);
             AddPassiveEdge(frontTopRight, backCenter, _normalBrush, 0.025);
             AddPassiveEdge(frontApex, backCenter, _normalBrush, 0.025);
         }
 
-        var highestY = Math.Max(backRoofY, eaveY + (HasGable ? gable : 0));
+        var highestY = topY + (HasGable ? gable : 0);
 
         if (resetView)
         {
@@ -326,13 +326,19 @@ public partial class MainWindow : Window
 
     private double ComputeScale()
     {
-        var roofRiseMm = Math.Tan(DegToRad(_roofPitchDeg)) * _depthMm;
-        var totalHeightMm = Math.Max(
-            _frontWallHeightMm + (HasGable ? _gableHeightMm : 0),
-            roofRiseMm);
-
-        var maxMm = Math.Max(_widthMm, Math.Max(totalHeightMm, _depthMm));
+        var depthMm = CalculateDormerDepthMm();
+        var totalHeightMm = _frontWallHeightMm + (HasGable ? _gableHeightMm : 0);
+        var maxMm = Math.Max(_widthMm, Math.Max(totalHeightMm, depthMm));
         return 3.5 / Math.Max(maxMm, 1);
+    }
+
+    private double CalculateDormerDepthMm()
+    {
+        var tangent = Math.Tan(DegToRad(_roofPitchDeg));
+        if (tangent <= 0.0001)
+            return 0;
+
+        return _frontWallHeightMm / tangent;
     }
 
     private void ViewportHost_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
