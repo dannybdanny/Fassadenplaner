@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private double _slopeLengthMm;
     private double _gableHeightMm = 800;
     private double _roofPitchDeg = 35;
+    private double _dormerRoofPitchDeg = 10;
 
     private string _selectedDimension = WidthKey;
 
@@ -63,6 +64,7 @@ public partial class MainWindow : Window
     }
 
     private bool HasGable => DormerTypeCombo.SelectedIndex == 1;
+    private bool HasShedRoof => DormerTypeCombo.SelectedIndex == 2;
 
     private void DormerTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -73,9 +75,16 @@ public partial class MainWindow : Window
         GableLabel.Visibility = HasGable ? Visibility.Visible : Visibility.Collapsed;
         GableValueText.Visibility = HasGable ? Visibility.Visible : Visibility.Collapsed;
 
+        ShedPitchRow.Height = HasShedRoof ? new GridLength(30) : new GridLength(0);
+        DormerPitchPanel.Visibility = HasShedRoof ? Visibility.Visible : Visibility.Collapsed;
+        DormerPitchLabel.Visibility = HasShedRoof ? Visibility.Visible : Visibility.Collapsed;
+        DormerPitchValueText.Visibility = HasShedRoof ? Visibility.Visible : Visibility.Collapsed;
+
         if (!HasGable && _selectedDimension == GableKey)
             _selectedDimension = WidthKey;
 
+        RecalculateFromPitchAndHeight();
+        RefreshDimensionSummary();
         BuildDormer(resetView: false);
         SelectDimension(_selectedDimension);
     }
@@ -104,6 +113,54 @@ public partial class MainWindow : Window
     private void ApplyRoofPitch_Click(object sender, RoutedEventArgs e)
         => ApplyRoofPitch();
 
+    private void DormerPitchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        ApplyDormerPitch();
+        e.Handled = true;
+    }
+
+    private void ApplyDormerPitch_Click(object sender, RoutedEventArgs e)
+        => ApplyDormerPitch();
+
+    private void ApplyDormerPitch()
+    {
+        var text = DormerPitchBox.Text.Trim().Replace(',', '.');
+
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch) ||
+            pitch < 0 || pitch >= 60)
+        {
+            MessageBox.Show(
+                "Bitte eine Gaubendachneigung zwischen 0° und 60° eingeben.",
+                "Ungültige Gaubendachneigung",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            DormerPitchBox.Focus();
+            DormerPitchBox.SelectAll();
+            return;
+        }
+
+        if (pitch >= _roofPitchDeg)
+        {
+            MessageBox.Show(
+                "Die Gaubendachneigung muss kleiner als die Hauptdachneigung sein.",
+                "Neigungen passen nicht zusammen",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            DormerPitchBox.Focus();
+            DormerPitchBox.SelectAll();
+            return;
+        }
+
+        _dormerRoofPitchDeg = pitch;
+        RecalculateFromPitchAndHeight();
+        RefreshDimensionSummary();
+        BuildDormer(resetView: false);
+        SelectDimension(_selectedDimension);
+    }
+
     private void ApplyRoofPitch()
     {
         var text = RoofPitchBox.Text.Trim().Replace(',', '.');
@@ -122,10 +179,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (HasShedRoof && pitch <= _dormerRoofPitchDeg)
+        {
+            MessageBox.Show(
+                "Die Hauptdachneigung muss größer als die Gaubendachneigung sein.",
+                "Neigungen passen nicht zusammen",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
         _roofPitchDeg = pitch;
 
         // Bei direkter Eingabe der Dachneigung bleibt die gemessene Front-Wandhöhe bestehen.
-        // Tiefe und untere Wangenlänge ergeben sich daraus.
+        // Tiefe und Wangenlänge ergeben sich aus Hauptdach- und ggf. Gaubendachneigung.
         RecalculateFromPitchAndHeight();
 
         RefreshDimensionSummary();
@@ -167,7 +234,9 @@ public partial class MainWindow : Window
                 break;
 
             case DepthKey:
-                _depthMm = valueMm;
+                _depthMm = HasShedRoof
+                    ? valueMm * Math.Cos(DegToRad(_dormerRoofPitchDeg))
+                    : valueMm;
                 RecalculateFromHeightAndDepth();
                 break;
 
@@ -198,14 +267,21 @@ public partial class MainWindow : Window
 
     private void RecalculateFromPitchAndHeight()
     {
-        var tangent = Math.Tan(DegToRad(_roofPitchDeg));
-        if (tangent <= 0.0001)
+        var mainTangent = Math.Tan(DegToRad(_roofPitchDeg));
+        var dormerTangent = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+
+        var tangentDifference = mainTangent - dormerTangent;
+        if (tangentDifference <= 0.0001)
             return;
 
-        _depthMm = _frontWallHeightMm / tangent;
+        _depthMm = _frontWallHeightMm / tangentDifference;
+
+        var backRiseMm = mainTangent * _depthMm;
         _slopeLengthMm = Math.Sqrt(
-            _frontWallHeightMm * _frontWallHeightMm +
-            _depthMm * _depthMm);
+            _depthMm * _depthMm +
+            backRiseMm * backRiseMm);
     }
 
     private void RecalculateFromHeightAndDepth()
@@ -213,33 +289,88 @@ public partial class MainWindow : Window
         if (_depthMm <= 0)
             return;
 
-        _roofPitchDeg = RadToDeg(Math.Atan(_frontWallHeightMm / _depthMm));
+        var dormerTangent = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+
+        _roofPitchDeg = RadToDeg(
+            Math.Atan((_frontWallHeightMm / _depthMm) + dormerTangent));
+
+        var backRiseMm = Math.Tan(DegToRad(_roofPitchDeg)) * _depthMm;
         _slopeLengthMm = Math.Sqrt(
-            _frontWallHeightMm * _frontWallHeightMm +
-            _depthMm * _depthMm);
+            _depthMm * _depthMm +
+            backRiseMm * backRiseMm);
     }
 
     private void RecalculateFromHeightAndSlope()
     {
-        var square = _slopeLengthMm * _slopeLengthMm -
-                     _frontWallHeightMm * _frontWallHeightMm;
-
-        if (square <= 0)
+        if (_slopeLengthMm <= 0)
             return;
 
-        _depthMm = Math.Sqrt(square);
-        _roofPitchDeg = RadToDeg(Math.Atan(_frontWallHeightMm / _depthMm));
+        var dormerTangent = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+
+        if (!HasShedRoof)
+        {
+            var square = _slopeLengthMm * _slopeLengthMm -
+                         _frontWallHeightMm * _frontWallHeightMm;
+
+            if (square <= 0)
+                return;
+
+            _depthMm = Math.Sqrt(square);
+            _roofPitchDeg = RadToDeg(
+                Math.Atan(_frontWallHeightMm / _depthMm));
+            return;
+        }
+
+        // Schleppdachgaube:
+        // s² = d² + (h + tan(beta) * d)²
+        var rootTerm =
+            (1 + dormerTangent * dormerTangent) *
+            _slopeLengthMm * _slopeLengthMm -
+            _frontWallHeightMm * _frontWallHeightMm;
+
+        if (rootTerm <= 0)
+            return;
+
+        _depthMm =
+            (-_frontWallHeightMm * dormerTangent + Math.Sqrt(rootTerm)) /
+            (1 + dormerTangent * dormerTangent);
+
+        if (_depthMm <= 0)
+            return;
+
+        _roofPitchDeg = RadToDeg(
+            Math.Atan(
+                (_frontWallHeightMm / _depthMm) +
+                dormerTangent));
+    }
+
+    private double GetDisplayedDepthMm()
+    {
+        if (!HasShedRoof)
+            return _depthMm;
+
+        var cosine = Math.Cos(DegToRad(_dormerRoofPitchDeg));
+        return Math.Abs(cosine) < 0.0001
+            ? _depthMm
+            : _depthMm / cosine;
     }
 
     private void RefreshDimensionSummary()
     {
         WidthValueText.Text = FormatCentimeters(_widthMm);
         HeightValueText.Text = FormatCentimeters(_frontWallHeightMm);
-        DepthValueText.Text = FormatCentimeters(_depthMm);
+        DepthLabel.Text = HasShedRoof ? "Gaubendachkante / Tiefe" : "Gaubentiefe";
+        DepthValueText.Text = FormatCentimeters(GetDisplayedDepthMm());
         SlopeValueText.Text = FormatCentimeters(_slopeLengthMm);
         GableValueText.Text = FormatCentimeters(_gableHeightMm);
         PitchValueText.Text = $"{_roofPitchDeg:0.#}°";
+        DormerPitchValueText.Text = $"{_dormerRoofPitchDeg:0.#}°";
         RoofPitchBox.Text = _roofPitchDeg.ToString("0.#", CultureInfo.InvariantCulture);
+        DormerPitchBox.Text = _dormerRoofPitchDeg.ToString("0.#", CultureInfo.InvariantCulture);
     }
 
     private static readonly CultureInfo GermanCulture = CultureInfo.GetCultureInfo("de-DE");
@@ -269,9 +400,11 @@ public partial class MainWindow : Window
                 break;
 
             case DepthKey:
-                SelectedDimensionTitle.Text = "Gaubentiefe";
-                SelectedDimensionHint.Text = "Waagerechte obere Wangenkante. Aus Höhe + Tiefe wird die Dachneigung berechnet.";
-                DimensionValueBox.Text = FormatCentimetersInput(_depthMm);
+                SelectedDimensionTitle.Text = HasShedRoof ? "Gaubendachkante / Tiefe" : "Gaubentiefe";
+                SelectedDimensionHint.Text = HasShedRoof
+                    ? "Geneigte obere Wangenkante der Schleppdachgaube. Aus Höhe, dieser Kante und 10° Gaubendachneigung wird die Hauptdachneigung berechnet."
+                    : "Waagerechte obere Wangenkante. Aus Höhe + Tiefe wird die Dachneigung berechnet.";
+                DimensionValueBox.Text = FormatCentimetersInput(GetDisplayedDepthMm());
                 break;
 
             case SlopeKey:
@@ -320,7 +453,10 @@ public partial class MainWindow : Window
 
         var frontRoofY = 0.0;
         var topY = height;
-        var backRoofY = topY;
+        var dormerPitchTan = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+        var backRoofY = topY + dormerPitchTan * depth;
 
         AddMainRoofPlane(width, depth, gable, scale);
 
@@ -351,7 +487,8 @@ public partial class MainWindow : Window
 
         if (!HasGable)
         {
-            // Flachdachgaube: geschlossene Front + waagerechte obere Fläche.
+            // Flachdach- oder Schleppdachgaube: geschlossene Front.
+            // Bei der Schleppdachgaube steigt die obere Fläche standardmäßig mit 10° nach hinten an.
             AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush);
             AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
 
@@ -966,7 +1103,7 @@ public partial class MainWindow : Window
     {
         WidthKey => FormatCentimeters(_widthMm),
         HeightKey => FormatCentimeters(_frontWallHeightMm),
-        DepthKey => FormatCentimeters(_depthMm),
+        DepthKey => FormatCentimeters(GetDisplayedDepthMm()),
         SlopeKey => FormatCentimeters(_slopeLengthMm),
         GableKey => FormatCentimeters(_gableHeightMm),
         _ => string.Empty
