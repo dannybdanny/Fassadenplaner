@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using System.Windows.Shapes;
 
 namespace Fassadenplaner;
 
@@ -28,7 +29,10 @@ public partial class MainWindow : Window
 
     private readonly Dictionary<string, List<GeometryModel3D>> _dimensionEdges = new();
     private readonly Dictionary<GeometryModel3D, string> _hitEdgeKeys = new();
+    private readonly Dictionary<GeometryModel3D, string> _surfaceKeys = new();
     private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
+
+    private string? _selectedSurfaceKey;
 
     private readonly Brush _normalBrush = new SolidColorBrush(Color.FromRgb(63, 77, 89));
     private readonly Brush _selectedBrush = new SolidColorBrush(Color.FromRgb(24, 119, 173));
@@ -52,7 +56,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        ViewportHost.SizeChanged += (_, _) => UpdateDimensionOverlay();
+        ViewportHost.SizeChanged += (_, _) =>
+        {
+            UpdateDimensionOverlay();
+            UpdateSurfaceDetail();
+        };
 
         Loaded += (_, _) =>
         {
@@ -432,6 +440,7 @@ public partial class MainWindow : Window
         DormerViewport.Children.Clear();
         _dimensionEdges.Clear();
         _hitEdgeKeys.Clear();
+        _surfaceKeys.Clear();
         _dimensionAnchors.Clear();
 
         var lights = new Model3DGroup();
@@ -469,8 +478,8 @@ public partial class MainWindow : Window
         var backIntersectionRight = new Point3D(x1, backRoofY, zBack);
 
         // Deckende Wangen: durch die Gaube darf die Hauptdachfläche nicht sichtbar sein.
-        AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush);
-        AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush);
+        AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush, "left-cheek");
+        AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush, "right-cheek");
 
         // Gemeinsame, auswählbare Grundkanten.
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
@@ -489,7 +498,7 @@ public partial class MainWindow : Window
         {
             // Flachdach- oder Schleppdachgaube: geschlossene Front.
             // Bei der Schleppdachgaube steigt die obere Fläche standardmäßig mit 10° nach hinten an.
-            AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush);
+            AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush, "front");
             AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
 
             AddEdge(frontTopLeft, frontTopRight, WidthKey);
@@ -519,7 +528,8 @@ public partial class MainWindow : Window
                 frontTopRight,
                 frontApex,
                 frontTopLeft,
-                _dormerFrontBrush);
+                _dormerFrontBrush,
+                "front");
 
             // Beide Dachflächen der Satteldachgaube reichen bis in das Hauptdach.
             AddQuadSurface(frontTopLeft, frontApex, backRidge, backIntersectionLeft, _dormerTopBrush);
@@ -562,7 +572,11 @@ public partial class MainWindow : Window
         UpdateCamera();
         HighlightSelectedDimension();
 
-        Dispatcher.BeginInvoke(UpdateDimensionOverlay);
+        Dispatcher.BeginInvoke(() =>
+        {
+            UpdateDimensionOverlay();
+            UpdateSurfaceDetail();
+        });
     }
 
     private void AddMainRoofPlane(double width, double depth, double gable, double scale)
@@ -647,9 +661,20 @@ public partial class MainWindow : Window
     {
         if (_isOrbiting && !_leftDragExceededThreshold)
         {
-            var key = HitTestDimension(e.GetPosition(DormerViewport));
-            if (key is not null)
-                SelectDimension(key);
+            var hit = HitTestScene(e.GetPosition(DormerViewport));
+
+            if (hit.DimensionKey is not null)
+            {
+                SelectDimension(hit.DimensionKey);
+            }
+            else if (hit.SurfaceKey is not null)
+            {
+                ShowSurfaceDetail(hit.SurfaceKey);
+            }
+            else
+            {
+                HideSurfaceDetail();
+            }
         }
 
         _isOrbiting = false;
@@ -746,28 +771,39 @@ public partial class MainWindow : Window
         UpdateDimensionOverlay();
     }
 
-    private string? HitTestDimension(Point point)
+    private (string? DimensionKey, string? SurfaceKey) HitTestScene(Point point)
     {
-        string? hitKey = null;
+        string? dimensionKey = null;
+        string? surfaceKey = null;
 
         VisualTreeHelper.HitTest(
             DormerViewport,
             null,
             result =>
             {
-                if (result is RayMeshGeometry3DHitTestResult ray &&
-                    ray.ModelHit is GeometryModel3D model &&
-                    _hitEdgeKeys.TryGetValue(model, out var key))
+                if (result is not RayMeshGeometry3DHitTestResult ray ||
+                    ray.ModelHit is not GeometryModel3D model)
                 {
-                    hitKey = key;
+                    return HitTestResultBehavior.Continue;
+                }
+
+                if (_hitEdgeKeys.TryGetValue(model, out var edgeKey))
+                {
+                    dimensionKey = edgeKey;
                     return HitTestResultBehavior.Stop;
+                }
+
+                if (surfaceKey is null &&
+                    _surfaceKeys.TryGetValue(model, out var foundSurface))
+                {
+                    surfaceKey = foundSurface;
                 }
 
                 return HitTestResultBehavior.Continue;
             },
             new PointHitTestParameters(point));
 
-        return hitKey;
+        return (dimensionKey, surfaceKey);
     }
 
     private static Button? FindButtonAncestor(DependencyObject? source)
@@ -785,7 +821,12 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void AddTriangleSurface(Point3D p1, Point3D p2, Point3D p3, Brush brush)
+    private void AddTriangleSurface(
+        Point3D p1,
+        Point3D p2,
+        Point3D p3,
+        Brush brush,
+        string? surfaceKey = null)
     {
         var mesh = new MeshGeometry3D();
 
@@ -797,10 +838,16 @@ public partial class MainWindow : Window
         mesh.TriangleIndices.Add(1);
         mesh.TriangleIndices.Add(2);
 
-        AddSurface(mesh, brush);
+        AddSurface(mesh, brush, surfaceKey);
     }
 
-    private void AddQuadSurface(Point3D p1, Point3D p2, Point3D p3, Point3D p4, Brush brush)
+    private void AddQuadSurface(
+        Point3D p1,
+        Point3D p2,
+        Point3D p3,
+        Point3D p4,
+        Brush brush,
+        string? surfaceKey = null)
     {
         var mesh = new MeshGeometry3D();
 
@@ -817,7 +864,7 @@ public partial class MainWindow : Window
         mesh.TriangleIndices.Add(2);
         mesh.TriangleIndices.Add(3);
 
-        AddSurface(mesh, brush);
+        AddSurface(mesh, brush, surfaceKey);
     }
 
     private void AddGableFrontSurface(
@@ -826,7 +873,8 @@ public partial class MainWindow : Window
         Point3D topRight,
         Point3D apex,
         Point3D topLeft,
-        Brush brush)
+        Brush brush,
+        string? surfaceKey = null)
     {
         var mesh = new MeshGeometry3D();
 
@@ -848,19 +896,26 @@ public partial class MainWindow : Window
         mesh.TriangleIndices.Add(2);
         mesh.TriangleIndices.Add(3);
 
-        AddSurface(mesh, brush);
+        AddSurface(mesh, brush, surfaceKey);
     }
 
-    private void AddSurface(MeshGeometry3D mesh, Brush brush)
+    private void AddSurface(
+        MeshGeometry3D mesh,
+        Brush brush,
+        string? surfaceKey = null)
     {
         var material = new DiffuseMaterial(brush);
+        var model = new GeometryModel3D(mesh, material)
+        {
+            BackMaterial = material
+        };
+
+        if (!string.IsNullOrWhiteSpace(surfaceKey))
+            _surfaceKeys[model] = surfaceKey;
 
         DormerViewport.Children.Add(new ModelVisual3D
         {
-            Content = new GeometryModel3D(mesh, material)
-            {
-                BackMaterial = material
-            }
+            Content = model
         });
     }
 
@@ -912,72 +967,29 @@ public partial class MainWindow : Window
             if (resource is null)
                 throw new InvalidOperationException("Ziegeltextur wurde nicht als WPF-Ressource gefunden.");
 
-            BitmapImage source;
+            BitmapImage bitmap;
 
             using (var stream = resource.Stream)
             {
-                source = new BitmapImage();
-                source.BeginInit();
-                source.CacheOption = BitmapCacheOption.OnLoad;
-                source.StreamSource = stream;
-                source.EndInit();
-                source.Freeze();
+                bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+                bitmap.Freeze();
             }
 
-            var sourceWidth = Math.Max(1, source.PixelWidth);
-            var sourceHeight = Math.Max(1, source.PixelHeight);
-
-            var roofAspect = roofSlopeLength > 0.0001
-                ? roofWidth / roofSlopeLength
-                : 1.0;
-
-            // Zielbitmap besteht ausschließlich aus GANZEN Texturkacheln.
-            // Dadurch können keine grauen Restflächen oder Zwischenstreifen entstehen.
-            var tilesY = 3;
-            var idealTilesX =
-                roofAspect * tilesY * sourceHeight / sourceWidth;
-
-            var tilesX = Math.Clamp(
-                (int)Math.Round(idealTilesX),
-                1,
-                12);
-
-            var targetWidth = sourceWidth * tilesX;
-            var targetHeight = sourceHeight * tilesY;
-
-            var visual = new DrawingVisual();
-
-            using (var dc = visual.RenderOpen())
-            {
-                for (var row = 0; row < tilesY; row++)
-                {
-                    for (var column = 0; column < tilesX; column++)
-                    {
-                        dc.DrawImage(
-                            source,
-                            new Rect(
-                                column * sourceWidth,
-                                row * sourceHeight,
-                                sourceWidth,
-                                sourceHeight));
-                    }
-                }
-            }
-
-            var tiledBitmap = new RenderTargetBitmap(
-                targetWidth,
-                targetHeight,
-                96,
-                96,
-                PixelFormats.Pbgra32);
-
-            tiledBitmap.Render(visual);
-            tiledBitmap.Freeze();
-
-            var brush = new ImageBrush(tiledBitmap)
+            // Das gelieferte Bild enthält bereits viele Ziegelreihen.
+            // Es wird deshalb genau EINMAL auf die komplette Dachfläche gelegt.
+            // Keine ImageBrush-Kachelung und keine Zwischenbitmap mehr.
+            var brush = new ImageBrush(bitmap)
             {
                 Stretch = Stretch.Fill,
                 TileMode = TileMode.None,
+                Viewbox = new Rect(0, 0, 1, 1),
+                ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
+                Viewport = new Rect(0, 0, 1, 1),
+                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
                 AlignmentX = AlignmentX.Left,
                 AlignmentY = AlignmentY.Top
             };
@@ -991,6 +1003,301 @@ public partial class MainWindow : Window
             fallback.Freeze();
             return fallback;
         }
+    }
+
+    private void ShowSurfaceDetail(string surfaceKey)
+    {
+        _selectedSurfaceKey = surfaceKey;
+        SurfaceDetailPanel.Visibility = Visibility.Visible;
+        UpdateSurfaceDetail();
+    }
+
+    private void HideSurfaceDetail()
+    {
+        _selectedSurfaceKey = null;
+        SurfaceDetailPanel.Visibility = Visibility.Collapsed;
+        SurfaceDetailCanvas.Children.Clear();
+    }
+
+    private void UpdateSurfaceDetail()
+    {
+        if (_selectedSurfaceKey is null ||
+            SurfaceDetailPanel.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        SurfaceDetailCanvas.Children.Clear();
+
+        if (_selectedSurfaceKey == "front")
+        {
+            DrawFrontDetail();
+            return;
+        }
+
+        if (_selectedSurfaceKey is "left-cheek" or "right-cheek")
+        {
+            DrawCheekDetail(_selectedSurfaceKey == "left-cheek");
+        }
+    }
+
+    private void DrawFrontDetail()
+    {
+        SurfaceDetailTitle.Text = "Gaubenfront";
+
+        var widthMm = _widthMm;
+        var wallHeightMm = _frontWallHeightMm;
+        var gableMm = HasGable ? _gableHeightMm : 0;
+
+        var areaM2 =
+            (widthMm * wallHeightMm +
+             (HasGable ? 0.5 * widthMm * gableMm : 0)) /
+            1_000_000.0;
+
+        SurfaceDetailAreaText.Text =
+            $"Fläche: {areaM2.ToString("0.00", GermanCulture)} m²";
+
+        const double left = 50;
+        const double top = 22;
+        const double maxWidth = 220;
+        const double maxHeight = 175;
+
+        var totalHeightMm = wallHeightMm + gableMm;
+        var scale = Math.Min(
+            maxWidth / Math.Max(widthMm, 1),
+            maxHeight / Math.Max(totalHeightMm, 1));
+
+        var w = widthMm * scale;
+        var wallH = wallHeightMm * scale;
+        var gableH = gableMm * scale;
+
+        var bottomY = top + gableH + wallH;
+        var wallTopY = top + gableH;
+
+        var points = new PointCollection();
+
+        if (HasGable)
+        {
+            points.Add(new Point(left, bottomY));
+            points.Add(new Point(left + w, bottomY));
+            points.Add(new Point(left + w, wallTopY));
+            points.Add(new Point(left + w / 2, top));
+            points.Add(new Point(left, wallTopY));
+        }
+        else
+        {
+            points.Add(new Point(left, bottomY));
+            points.Add(new Point(left + w, bottomY));
+            points.Add(new Point(left + w, wallTopY));
+            points.Add(new Point(left, wallTopY));
+        }
+
+        AddDetailPolygon(points);
+        AddHorizontalDimension(
+            left,
+            left + w,
+            bottomY + 22,
+            FormatCentimeters(widthMm));
+
+        AddVerticalDimension(
+            left - 25,
+            bottomY,
+            wallTopY,
+            FormatCentimeters(wallHeightMm));
+
+        if (HasGable)
+        {
+            AddVerticalDimension(
+                left + w + 24,
+                wallTopY,
+                top,
+                FormatCentimeters(gableMm));
+        }
+    }
+
+    private void DrawCheekDetail(bool isLeft)
+    {
+        SurfaceDetailTitle.Text =
+            isLeft ? "Gaubenwange links" : "Gaubenwange rechts";
+
+        var mainTan = Math.Tan(DegToRad(_roofPitchDeg));
+        var backRiseMm = mainTan * _depthMm;
+
+        var areaM2 =
+            0.5 * _frontWallHeightMm * _depthMm /
+            1_000_000.0;
+
+        SurfaceDetailAreaText.Text =
+            $"Fläche: {areaM2.ToString("0.00", GermanCulture)} m²";
+
+        const double left = 55;
+        const double top = 18;
+        const double maxWidth = 205;
+        const double maxHeight = 175;
+
+        var maxVerticalMm = Math.Max(backRiseMm, _frontWallHeightMm);
+        var scale = Math.Min(
+            maxWidth / Math.Max(_depthMm, 1),
+            maxHeight / Math.Max(maxVerticalMm, 1));
+
+        var d = _depthMm * scale;
+        var frontH = _frontWallHeightMm * scale;
+        var backH = backRiseMm * scale;
+
+        var baseY = top + maxVerticalMm * scale;
+        var frontBottom = new Point(left, baseY);
+        var frontTop = new Point(left, baseY - frontH);
+        var backPoint = new Point(left + d, baseY - backH);
+
+        AddDetailPolygon(
+            new PointCollection
+            {
+                frontBottom,
+                backPoint,
+                frontTop
+            });
+
+        AddVerticalDimension(
+            left - 26,
+            frontBottom.Y,
+            frontTop.Y,
+            FormatCentimeters(_frontWallHeightMm));
+
+        AddDimensionAlongEdge(
+            frontTop,
+            backPoint,
+            FormatCentimeters(GetDisplayedDepthMm()),
+            -15);
+
+        AddDimensionAlongEdge(
+            frontBottom,
+            backPoint,
+            FormatCentimeters(_slopeLengthMm),
+            17);
+    }
+
+    private void AddDetailPolygon(PointCollection points)
+    {
+        SurfaceDetailCanvas.Children.Add(
+            new Polygon
+            {
+                Points = points,
+                Fill = new SolidColorBrush(Color.FromRgb(231, 236, 240)),
+                Stroke = new SolidColorBrush(Color.FromRgb(55, 72, 84)),
+                StrokeThickness = 1.4
+            });
+    }
+
+    private void AddHorizontalDimension(
+        double x1,
+        double x2,
+        double y,
+        string text)
+    {
+        var stroke = new SolidColorBrush(Color.FromRgb(95, 107, 117));
+
+        SurfaceDetailCanvas.Children.Add(
+            new Line
+            {
+                X1 = x1,
+                X2 = x2,
+                Y1 = y,
+                Y2 = y,
+                Stroke = stroke,
+                StrokeThickness = 1
+            });
+
+        AddSmallTick(x1, y - 5, x1, y + 5, stroke);
+        AddSmallTick(x2, y - 5, x2, y + 5, stroke);
+        AddDetailText(text, (x1 + x2) / 2, y - 16);
+    }
+
+    private void AddVerticalDimension(
+        double x,
+        double y1,
+        double y2,
+        string text)
+    {
+        var stroke = new SolidColorBrush(Color.FromRgb(95, 107, 117));
+
+        SurfaceDetailCanvas.Children.Add(
+            new Line
+            {
+                X1 = x,
+                X2 = x,
+                Y1 = y1,
+                Y2 = y2,
+                Stroke = stroke,
+                StrokeThickness = 1
+            });
+
+        AddSmallTick(x - 5, y1, x + 5, y1, stroke);
+        AddSmallTick(x - 5, y2, x + 5, y2, stroke);
+        AddDetailText(text, x, (y1 + y2) / 2);
+    }
+
+    private void AddDimensionAlongEdge(
+        Point a,
+        Point b,
+        string text,
+        double normalOffset)
+    {
+        var dx = b.X - a.X;
+        var dy = b.Y - a.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+
+        if (length < 0.001)
+            return;
+
+        var nx = -dy / length;
+        var ny = dx / length;
+
+        var midX = (a.X + b.X) / 2 + nx * normalOffset;
+        var midY = (a.Y + b.Y) / 2 + ny * normalOffset;
+
+        AddDetailText(text, midX, midY);
+    }
+
+    private void AddSmallTick(
+        double x1,
+        double y1,
+        double x2,
+        double y2,
+        Brush stroke)
+    {
+        SurfaceDetailCanvas.Children.Add(
+            new Line
+            {
+                X1 = x1,
+                X2 = x2,
+                Y1 = y1,
+                Y2 = y2,
+                Stroke = stroke,
+                StrokeThickness = 1
+            });
+    }
+
+    private void AddDetailText(string text, double x, double y)
+    {
+        var label = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(235, 255, 255, 255)),
+            Padding = new Thickness(3, 1, 3, 1),
+            Child = new TextBlock
+            {
+                Text = text,
+                FontSize = 10.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(52, 65, 75))
+            }
+        };
+
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        Canvas.SetLeft(label, x - label.DesiredSize.Width / 2);
+        Canvas.SetTop(label, y - label.DesiredSize.Height / 2);
+
+        SurfaceDetailCanvas.Children.Add(label);
     }
 
     private void AddEdge(Point3D start, Point3D end, string dimensionKey)
