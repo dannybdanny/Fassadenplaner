@@ -238,7 +238,11 @@ public static class UpdateService
         if (dashIndex >= 0)
             clean = clean[..dashIndex];
 
-        return Version.TryParse(clean, out version!);
+        if (!Version.TryParse(clean, out var parsed) || parsed is null)
+            return false;
+
+        version = parsed;
+        return true;
     }
 
     private static Version Normalize(Version version)
