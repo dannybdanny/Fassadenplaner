@@ -52,9 +52,13 @@ public partial class MainWindow : Window
     private double _cameraDistance = 12.5;
     private Point3D _cameraTarget = new(0, 1.2, 0);
 
+    private UpdateInfo? _pendingUpdate;
+
     public MainWindow()
     {
         InitializeComponent();
+
+        InstalledVersionText.Text = $"Installiert: {UpdateService.CurrentVersionDisplay}";
 
         ViewportHost.SizeChanged += (_, _) =>
         {
@@ -69,6 +73,73 @@ public partial class MainWindow : Window
             BuildDormer(resetView: true);
             SelectDimension(WidthKey);
         };
+    }
+
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        CheckUpdatesButton.IsEnabled = false;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
+        UpdateStatusText.Text = "Suche nach einer neueren Version …";
+
+        try
+        {
+            _pendingUpdate = await UpdateService.CheckForUpdateAsync();
+
+            if (_pendingUpdate is null)
+            {
+                UpdateStatusText.Text =
+                    $"Du hast bereits die aktuelle Version {UpdateService.CurrentVersionDisplay}.";
+                return;
+            }
+
+            UpdateStatusText.Text =
+                $"Version {_pendingUpdate.Version} ist verfügbar." +
+                (string.IsNullOrWhiteSpace(_pendingUpdate.Notes)
+                    ? string.Empty
+                    : $"  {_pendingUpdate.Notes}");
+
+            InstallUpdateButton.Content =
+                $"Version {_pendingUpdate.Version} installieren";
+            InstallUpdateButton.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text =
+                "Updateprüfung nicht möglich: " + ex.Message;
+        }
+        finally
+        {
+            CheckUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate is null)
+            return;
+
+        InstallUpdateButton.IsEnabled = false;
+        CheckUpdatesButton.IsEnabled = false;
+        UpdateStatusText.Text =
+            $"Version {_pendingUpdate.Version} wird vorbereitet …";
+
+        try
+        {
+            var installerPath =
+                await UpdateService.PrepareInstallerAsync(_pendingUpdate);
+
+            UpdateStatusText.Text = "Installer wird gestartet …";
+
+            UpdateService.StartInstaller(installerPath);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text =
+                "Update konnte nicht gestartet werden: " + ex.Message;
+            InstallUpdateButton.IsEnabled = true;
+            CheckUpdatesButton.IsEnabled = true;
+        }
     }
 
     private bool HasGable => DormerTypeCombo.SelectedIndex == 1;
