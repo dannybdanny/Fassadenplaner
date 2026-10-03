@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -95,7 +96,7 @@ public static class UpdateService
                     "Der neue Installer wurde im lokalen Build-Ordner nicht gefunden.");
             }
 
-            return update.InstallerPath;
+            return update.InstallerPath!;
         }
 
         if (string.IsNullOrWhiteSpace(update.DownloadUrl))
