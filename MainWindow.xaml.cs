@@ -72,6 +72,8 @@ public partial class MainWindow : Window
             RefreshDimensionSummary();
             BuildDormer(resetView: true);
             SelectDimension(WidthKey);
+            ShowDormerTool();
+            RecalculateCladding();
         };
     }
 
@@ -140,6 +142,118 @@ public partial class MainWindow : Window
             InstallUpdateButton.IsEnabled = true;
             CheckUpdatesButton.IsEnabled = true;
         }
+    }
+
+    private void DormerTool_Click(object sender, RoutedEventArgs e)
+        => ShowDormerTool();
+
+    private void CladdingTool_Click(object sender, RoutedEventArgs e)
+        => ShowCladdingTool();
+
+    private void ShowDormerTool()
+    {
+        DormerPropertiesPanel.Visibility = Visibility.Visible;
+        CladdingPropertiesPanel.Visibility = Visibility.Collapsed;
+
+        ToolPanelTitle.Text = "Gaube";
+        ToolPanelSubtitle.Text = "Geometrie, Maße und Flächen";
+
+        DormerToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(231, 241, 247));
+        DormerToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(112, 153, 176));
+
+        CladdingToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        CladdingToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+    }
+
+    private void ShowCladdingTool()
+    {
+        DormerPropertiesPanel.Visibility = Visibility.Collapsed;
+        CladdingPropertiesPanel.Visibility = Visibility.Visible;
+
+        ToolPanelTitle.Text = "Bekleidung";
+        ToolPanelSubtitle.Text = "Coil, Falz, Deckbreite und Umschläge";
+
+        CladdingToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(231, 241, 247));
+        CladdingToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(112, 153, 176));
+
+        DormerToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        DormerToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
+        RecalculateCladding();
+    }
+
+    private void CladdingValue_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        RecalculateCladding();
+    }
+
+    private void RecalculateCladding()
+    {
+        if (CoilWidthBox is null ||
+            OverlapBox is null ||
+            UnderlapBox is null ||
+            TopAllowanceBox is null ||
+            BottomAllowanceBox is null)
+        {
+            return;
+        }
+
+        var coil = ParseMillimeters(CoilWidthBox.Text);
+        var overlap = ParseMillimeters(OverlapBox.Text);
+        var underlap = ParseMillimeters(UnderlapBox.Text);
+        var top = ParseMillimeters(TopAllowanceBox.Text);
+        var bottom = ParseMillimeters(BottomAllowanceBox.Text);
+
+        var deckWidth = coil - overlap - underlap;
+
+        if (coil <= 0 || overlap < 0 || underlap < 0 || deckWidth <= 0)
+        {
+            DeckWidthText.Text = "–";
+            DeckWidthText.Foreground =
+                new SolidColorBrush(Color.FromRgb(173, 66, 66));
+
+            CladdingSummaryText.Text =
+                "Bitte gültige Werte eingeben. Coilbreite muss größer als Überdeck + Unterdeck sein.";
+            return;
+        }
+
+        DeckWidthText.Text = $"{deckWidth:0.#} mm";
+        DeckWidthText.Foreground =
+            new SolidColorBrush(Color.FromRgb(30, 83, 107));
+
+        CladdingSummaryText.Text =
+            $"{coil:0.#} mm Coil → {deckWidth:0.#} mm Deckbreite · " +
+            $"oben {Math.Max(top, 0):0.#} mm · unten {Math.Max(bottom, 0):0.#} mm";
+    }
+
+    private static double ParseMillimeters(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return 0;
+
+        var normalized = text
+            .Replace("mm", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim()
+            .Replace(',', '.');
+
+        return double.TryParse(
+            normalized,
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
     }
 
     private bool HasGable => DormerTypeCombo.SelectedIndex == 1;
