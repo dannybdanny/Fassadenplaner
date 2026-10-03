@@ -41,132 +41,138 @@
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
 
-        <Style x:Key="RibbonCaption" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10.5"/>
+        <Style x:Key="ToolTileButton" TargetType="Button">
+            <Setter Property="Width" Value="128"/>
+            <Setter Property="Height" Value="78"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#F7F9FB"/>
+            <Setter Property="Foreground" Value="#263845"/>
+            <Setter Property="BorderBrush" Value="#D5DEE5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#778691"/>
-            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Foreground" Value="#83919C"/>
         </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="104"/>
+            <RowDefinition Height="110"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Oberes Menüband -->
+        <!-- Werkzeugleiste -->
         <Border Grid.Row="0"
                 Background="White"
                 BorderBrush="#D5DDE4"
                 BorderThickness="0,0,0,1">
-            <Grid Margin="22,12">
+            <Grid Margin="22,13">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="230"/>
-                    <ColumnDefinition Width="1"/>
-                    <ColumnDefinition Width="260"/>
-                    <ColumnDefinition Width="1"/>
-                    <ColumnDefinition Width="255"/>
-                    <ColumnDefinition Width="1"/>
-                    <ColumnDefinition Width="255"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="245"/>
+                    <ColumnDefinition Width="250"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0"
+                            VerticalAlignment="Center">
                     <TextBlock Text="Fassadenplaner"
                                FontSize="25"
                                FontWeight="SemiBold"
                                Foreground="#18242E"/>
-                    <TextBlock Text="Gauben · Fassaden · Blechplanung"
+                    <TextBlock Text="Visuell planen statt Maße suchen"
                                Margin="0,3,0,0"
                                FontSize="11.5"
                                Foreground="#7A8893"/>
                 </StackPanel>
 
-                <Border Grid.Column="1"
-                        Width="1"
-                        Background="#E1E6EA"
-                        Margin="0,3"/>
+                <!-- Gauben-Werkzeug -->
+                <Button x:Name="DormerToolButton"
+                        Grid.Column="1"
+                        Style="{StaticResource ToolTileButton}"
+                        Margin="8,0,8,0"
+                        Click="DormerTool_Click">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="48"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="2"
-                            Margin="18,0"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="GAUBENFORM" Style="{StaticResource RibbonCaption}"/>
-                    <ComboBox x:Name="DormerTypeCombo"
-                              SelectedIndex="0"
-                              SelectionChanged="DormerTypeCombo_SelectionChanged">
-                        <ComboBoxItem Content="Flachdachgaube"/>
-                        <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
-                        <ComboBoxItem Content="Schleppdachgaube"/>
-                    </ComboBox>
-                </StackPanel>
+                        <Canvas Width="52" Height="40"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <Polygon Points="5,31 15,16 37,16 47,31"
+                                     Fill="#E8EDF1"
+                                     Stroke="#263845"
+                                     StrokeThickness="2"/>
+                            <Polyline Points="15,16 15,9 37,9 37,16"
+                                      Stroke="#263845"
+                                      StrokeThickness="2"
+                                      StrokeLineJoin="Round"/>
+                            <Line X1="5" Y1="31" X2="47" Y2="31"
+                                  Stroke="#263845"
+                                  StrokeThickness="2"/>
+                        </Canvas>
 
-                <Border Grid.Column="3"
-                        Width="1"
-                        Background="#E1E6EA"
-                        Margin="0,3"/>
+                        <TextBlock Grid.Row="1"
+                                   Text="Gaube"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                    </Grid>
+                </Button>
 
+                <!-- Coil-Werkzeug -->
+                <Button x:Name="CladdingToolButton"
+                        Grid.Column="2"
+                        Style="{StaticResource ToolTileButton}"
+                        Margin="0,0,8,0"
+                        Click="CladdingTool_Click">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="48"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Canvas Width="58" Height="40"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <Ellipse Width="31" Height="31"
+                                     Canvas.Left="4" Canvas.Top="4"
+                                     Fill="#E8EDF1"
+                                     Stroke="#263845"
+                                     StrokeThickness="2"/>
+                            <Ellipse Width="13" Height="13"
+                                     Canvas.Left="13" Canvas.Top="13"
+                                     Fill="White"
+                                     Stroke="#263845"
+                                     StrokeThickness="2"/>
+                            <Path Data="M 34,9 C 47,9 52,14 52,22 L 52,33 L 29,33"
+                                  Stroke="#263845"
+                                  StrokeThickness="2"
+                                  Fill="Transparent"
+                                  StrokeLineJoin="Round"/>
+                            <Line X1="29" Y1="33" X2="50" Y2="33"
+                                  Stroke="#263845"
+                                  StrokeThickness="2"/>
+                        </Canvas>
+
+                        <TextBlock Grid.Row="1"
+                                   Text="Bekleidung"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                    </Grid>
+                </Button>
+
+                <!-- Updatebereich -->
                 <StackPanel Grid.Column="4"
-                            Margin="18,0"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="HAUPTDACHNEIGUNG" Style="{StaticResource RibbonCaption}"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="78"/>
-                            <ColumnDefinition Width="28"/>
-                            <ColumnDefinition Width="110"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="RoofPitchBox"
-                                 Grid.Column="0"
-                                 Text="35"
-                                 PreviewKeyDown="RoofPitchBox_PreviewKeyDown"/>
-                        <TextBlock Grid.Column="1"
-                                   Text="°"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   Foreground="#6E7A86"/>
-                        <Button Grid.Column="2"
-                                Content="Übernehmen"
-                                Margin="4,0,0,0"
-                                Click="ApplyRoofPitch_Click"/>
-                    </Grid>
-                </StackPanel>
-
-                <Border Grid.Column="5"
-                        Width="1"
-                        Background="#E1E6EA"
-                        Margin="0,3"/>
-
-                <StackPanel x:Name="DormerPitchPanel"
-                            Grid.Column="6"
-                            Margin="18,0"
-                            VerticalAlignment="Center"
-                            Visibility="Collapsed">
-                    <TextBlock Text="GAUBENDACHNEIGUNG" Style="{StaticResource RibbonCaption}"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="78"/>
-                            <ColumnDefinition Width="28"/>
-                            <ColumnDefinition Width="110"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="DormerPitchBox"
-                                 Grid.Column="0"
-                                 Text="10"
-                                 PreviewKeyDown="DormerPitchBox_PreviewKeyDown"/>
-                        <TextBlock Grid.Column="1"
-                                   Text="°"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   Foreground="#6E7A86"/>
-                        <Button Grid.Column="2"
-                                Content="Übernehmen"
-                                Margin="4,0,0,0"
-                                Click="ApplyDormerPitch_Click"/>
-                    </Grid>
-                </StackPanel>
-
-                <StackPanel Grid.Column="8"
                             VerticalAlignment="Center">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -175,9 +181,12 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="PROGRAMM"
-                                       Style="{StaticResource RibbonCaption}"/>
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="#83919C"/>
                             <TextBlock x:Name="InstalledVersionText"
                                        Text="Installiert: –"
+                                       Margin="0,3,0,0"
                                        FontSize="11"
                                        Foreground="#6F7E89"/>
                         </StackPanel>
@@ -208,10 +217,10 @@
         <Grid Grid.Row="1" Margin="18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="332"/>
+                <ColumnDefinition Width="350"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Großer 3D-Arbeitsbereich -->
+            <!-- 3D-Viewer -->
             <Border Grid.Column="0"
                     Margin="0,0,14,0"
                     Background="White"
@@ -278,7 +287,7 @@
                 </Grid>
             </Border>
 
-            <!-- Rechte Info-/Eigenschaftenleiste -->
+            <!-- Rechte kontextabhängige Seitenleiste -->
             <Border Grid.Column="1"
                     Background="White"
                     BorderBrush="#D7DEE5"
@@ -287,150 +296,398 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="18">
 
-                        <TextBlock Text="Eigenschaften"
+                        <TextBlock x:Name="ToolPanelTitle"
+                                   Text="Gaube"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="#1E2B35"/>
-                        <TextBlock Text="Kontextbezogene Maße und Flächen"
+                        <TextBlock x:Name="ToolPanelSubtitle"
+                                   Text="Geometrie, Maße und Flächen"
                                    Margin="0,3,0,16"
                                    FontSize="11"
                                    Foreground="#80909B"/>
 
-                        <Border Background="#F5F7F9"
-                                BorderBrush="#DDE4E9"
-                                BorderThickness="1"
-                                CornerRadius="9"
-                                Padding="14"
-                                Margin="0,0,0,16">
-                            <StackPanel>
-                                <TextBlock Text="AUSGEWÄHLTE KANTE"
-                                           FontSize="10"
-                                           FontWeight="SemiBold"
-                                           Foreground="#83919C"/>
+                        <!-- GAUBEN-EIGENSCHAFTEN -->
+                        <StackPanel x:Name="DormerPropertiesPanel">
 
-                                <TextBlock x:Name="SelectedDimensionTitle"
-                                           Text="Gaubenbreite"
-                                           Margin="0,4,0,3"
-                                           FontSize="18"
-                                           FontWeight="SemiBold"
-                                           Foreground="#1D2B36"/>
+                            <TextBlock Text="GAUBENFORM"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <ComboBox x:Name="DormerTypeCombo"
+                                      Margin="0,6,0,14"
+                                      SelectedIndex="0"
+                                      SelectionChanged="DormerTypeCombo_SelectionChanged">
+                                <ComboBoxItem Content="Flachdachgaube"/>
+                                <ComboBoxItem Content="Satteldachgaube mit Giebel"/>
+                                <ComboBoxItem Content="Schleppdachgaube"/>
+                            </ComboBox>
 
-                                <TextBlock x:Name="SelectedDimensionHint"
-                                           Text="Horizontale Kante der Gaubenfront"
-                                           Margin="0,0,0,11"
-                                           FontSize="11"
-                                           Foreground="#7B8792"
-                                           TextWrapping="Wrap"/>
+                            <TextBlock Text="HAUPTDACHNEIGUNG"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <Grid Margin="0,6,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="32"/>
+                                    <ColumnDefinition Width="110"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="RoofPitchBox"
+                                         Grid.Column="0"
+                                         Text="35"
+                                         PreviewKeyDown="RoofPitchBox_PreviewKeyDown"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="°"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#6E7A86"/>
+                                <Button Grid.Column="2"
+                                        Content="Übernehmen"
+                                        Margin="4,0,0,0"
+                                        Click="ApplyRoofPitch_Click"/>
+                            </Grid>
 
-                                <Grid>
+                            <StackPanel x:Name="DormerPitchPanel"
+                                        Visibility="Collapsed"
+                                        Margin="0,0,0,14">
+                                <TextBlock Text="GAUBENDACHNEIGUNG"
+                                           Style="{StaticResource SectionTitle}"/>
+                                <Grid Margin="0,6,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="32"/>
+                                        <ColumnDefinition Width="110"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="DimensionValueBox"
+                                    <TextBox x:Name="DormerPitchBox"
                                              Grid.Column="0"
-                                             Text="300"
-                                             PreviewKeyDown="DimensionValueBox_PreviewKeyDown"/>
+                                             Text="10"
+                                             PreviewKeyDown="DormerPitchBox_PreviewKeyDown"/>
                                     <TextBlock Grid.Column="1"
-                                               Text="cm"
+                                               Text="°"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Center"
-                                               FontSize="11"
                                                Foreground="#6E7A86"/>
+                                    <Button Grid.Column="2"
+                                            Content="Übernehmen"
+                                            Margin="4,0,0,0"
+                                            Click="ApplyDormerPitch_Click"/>
                                 </Grid>
-
-                                <Button Content="Maß übernehmen"
-                                        Margin="0,10,0,0"
-                                        Click="ApplyDimension_Click"/>
                             </StackPanel>
-                        </Border>
 
-                        <TextBlock Text="AKTUELLE MAẞE"
-                                   Style="{StaticResource LabelStyle}"/>
+                            <Border Background="#F5F7F9"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="14"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="AUSGEWÄHLTE KANTE"
+                                               Style="{StaticResource SectionTitle}"/>
 
-                        <Grid Margin="0,9,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition x:Name="ShedPitchRow" Height="0"/>
-                                <RowDefinition x:Name="GableRow" Height="0"/>
-                            </Grid.RowDefinitions>
+                                    <TextBlock x:Name="SelectedDimensionTitle"
+                                               Text="Gaubenbreite"
+                                               Margin="0,4,0,3"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1D2B36"/>
 
-                            <TextBlock Grid.Row="0" Text="Breite" Foreground="#586672"/>
-                            <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="300 cm" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="SelectedDimensionHint"
+                                               Text="Horizontale Kante der Gaubenfront"
+                                               Margin="0,0,0,11"
+                                               FontSize="11"
+                                               Foreground="#7B8792"
+                                               TextWrapping="Wrap"/>
 
-                            <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#586672"/>
-                            <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="160 cm" FontWeight="SemiBold"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="42"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DimensionValueBox"
+                                                 Grid.Column="0"
+                                                 Text="300"
+                                                 PreviewKeyDown="DimensionValueBox_PreviewKeyDown"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="cm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="11"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
 
-                            <TextBlock x:Name="DepthLabel" Grid.Row="2" Text="Gaubentiefe" Foreground="#586672"/>
-                            <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="228,5 cm" FontWeight="SemiBold"/>
+                                    <Button Content="Maß übernehmen"
+                                            Margin="0,10,0,0"
+                                            Click="ApplyDimension_Click"/>
+                                </StackPanel>
+                            </Border>
 
-                            <TextBlock Grid.Row="3" Text="Untere Wangenlänge" Foreground="#586672"/>
-                            <TextBlock x:Name="SlopeValueText" Grid.Row="3" Grid.Column="1" Text="279 cm" FontWeight="SemiBold"/>
+                            <TextBlock Text="AKTUELLE MAẞE"
+                                       Style="{StaticResource LabelStyle}"/>
 
-                            <TextBlock Grid.Row="4" Text="Hauptdachneigung" Foreground="#586672"/>
-                            <TextBlock x:Name="PitchValueText" Grid.Row="4" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
-
-                            <TextBlock x:Name="DormerPitchLabel" Grid.Row="5" Text="Gaubendachneigung" Foreground="#586672" Visibility="Collapsed"/>
-                            <TextBlock x:Name="DormerPitchValueText" Grid.Row="5" Grid.Column="1" Text="10°" FontWeight="SemiBold" Visibility="Collapsed"/>
-
-                            <TextBlock x:Name="GableLabel" Grid.Row="6" Text="Giebelhöhe" Foreground="#586672" Visibility="Collapsed"/>
-                            <TextBlock x:Name="GableValueText" Grid.Row="6" Grid.Column="1" Text="80 cm" FontWeight="SemiBold" Visibility="Collapsed"/>
-                        </Grid>
-
-                        <Border Height="1"
-                                Background="#E3E8EC"
-                                Margin="0,15,0,15"/>
-
-                        <!-- 2D-Flächenansicht jetzt fest in der rechten Leiste -->
-                        <Border x:Name="SurfaceDetailPanel"
-                                Height="245"
-                                Padding="10"
-                                CornerRadius="9"
-                                Background="#F8FAFB"
-                                BorderBrush="#D4DDE4"
-                                BorderThickness="1"
-                                Visibility="Collapsed">
-                            <Grid>
+                            <Grid Margin="0,9,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition x:Name="ShedPitchRow" Height="0"/>
+                                    <RowDefinition x:Name="GableRow" Height="0"/>
                                 </Grid.RowDefinitions>
 
-                                <TextBlock x:Name="SurfaceDetailTitle"
-                                           Grid.Row="0"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="#243440"/>
+                                <TextBlock Grid.Row="0" Text="Breite" Foreground="#586672"/>
+                                <TextBlock x:Name="WidthValueText" Grid.Row="0" Grid.Column="1" Text="300 cm" FontWeight="SemiBold"/>
 
-                                <Canvas x:Name="SurfaceDetailCanvas"
-                                        Grid.Row="1"
-                                        Margin="0,7,0,5"
-                                        Background="Transparent"/>
+                                <TextBlock Grid.Row="1" Text="Front-Wandhöhe" Foreground="#586672"/>
+                                <TextBlock x:Name="HeightValueText" Grid.Row="1" Grid.Column="1" Text="160 cm" FontWeight="SemiBold"/>
 
-                                <TextBlock x:Name="SurfaceDetailAreaText"
-                                           Grid.Row="2"
-                                           HorizontalAlignment="Right"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           Foreground="#243440"/>
+                                <TextBlock x:Name="DepthLabel" Grid.Row="2" Text="Gaubentiefe" Foreground="#586672"/>
+                                <TextBlock x:Name="DepthValueText" Grid.Row="2" Grid.Column="1" Text="228,5 cm" FontWeight="SemiBold"/>
+
+                                <TextBlock Grid.Row="3" Text="Untere Wangenlänge" Foreground="#586672"/>
+                                <TextBlock x:Name="SlopeValueText" Grid.Row="3" Grid.Column="1" Text="279 cm" FontWeight="SemiBold"/>
+
+                                <TextBlock Grid.Row="4" Text="Hauptdachneigung" Foreground="#586672"/>
+                                <TextBlock x:Name="PitchValueText" Grid.Row="4" Grid.Column="1" Text="35°" FontWeight="SemiBold"/>
+
+                                <TextBlock x:Name="DormerPitchLabel" Grid.Row="5" Text="Gaubendachneigung" Foreground="#586672" Visibility="Collapsed"/>
+                                <TextBlock x:Name="DormerPitchValueText" Grid.Row="5" Grid.Column="1" Text="10°" FontWeight="SemiBold" Visibility="Collapsed"/>
+
+                                <TextBlock x:Name="GableLabel" Grid.Row="6" Text="Giebelhöhe" Foreground="#586672" Visibility="Collapsed"/>
+                                <TextBlock x:Name="GableValueText" Grid.Row="6" Grid.Column="1" Text="80 cm" FontWeight="SemiBold" Visibility="Collapsed"/>
                             </Grid>
-                        </Border>
+
+                            <Border Height="1"
+                                    Background="#E3E8EC"
+                                    Margin="0,15,0,15"/>
+
+                            <Border x:Name="SurfaceDetailPanel"
+                                    Height="245"
+                                    Padding="10"
+                                    CornerRadius="9"
+                                    Background="#F8FAFB"
+                                    BorderBrush="#D4DDE4"
+                                    BorderThickness="1"
+                                    Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock x:Name="SurfaceDetailTitle"
+                                               Grid.Row="0"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="#243440"/>
+
+                                    <Canvas x:Name="SurfaceDetailCanvas"
+                                            Grid.Row="1"
+                                            Margin="0,7,0,5"
+                                            Background="Transparent"/>
+
+                                    <TextBlock x:Name="SurfaceDetailAreaText"
+                                               Grid.Row="2"
+                                               HorizontalAlignment="Right"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="#243440"/>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- BEKLEIDUNGS-/COIL-EIGENSCHAFTEN -->
+                        <StackPanel x:Name="CladdingPropertiesPanel"
+                                    Visibility="Collapsed">
+
+                            <Border Background="#F5F7F9"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="14"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="MATERIAL / COIL"
+                                               Style="{StaticResource SectionTitle}"/>
+
+                                    <TextBlock Text="Material"
+                                               Margin="0,10,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <ComboBox x:Name="CladdingMaterialCombo"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="Titanzink"/>
+                                        <ComboBoxItem Content="Aluminium"/>
+                                        <ComboBoxItem Content="Kupfer"/>
+                                        <ComboBoxItem Content="Edelstahl"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Zinkcoil-Breite"
+                                               Margin="0,12,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="44"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CoilWidthBox"
+                                                 Text="670"
+                                                 TextChanged="CladdingValue_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#F8FAFB"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="14"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="FALZ / DECKBREITE"
+                                               Style="{StaticResource SectionTitle}"/>
+
+                                    <TextBlock Text="Überdeck"
+                                               Margin="0,10,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="44"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="OverlapBox"
+                                                 Text="35"
+                                                 TextChanged="CladdingValue_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+
+                                    <TextBlock Text="Unterdeck"
+                                               Margin="0,10,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="44"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="UnderlapBox"
+                                                 Text="25"
+                                                 TextChanged="CladdingValue_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+
+                                    <Border Background="#EEF4F7"
+                                            BorderBrush="#D1DDE4"
+                                            BorderThickness="1"
+                                            CornerRadius="7"
+                                            Padding="11"
+                                            Margin="0,13,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Deckbreite einer Schar"
+                                                           FontSize="11"
+                                                           Foreground="#61717D"/>
+                                                <TextBlock Text="Coil − Überdeck − Unterdeck"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="9.5"
+                                                           Foreground="#8A969F"/>
+                                            </StackPanel>
+                                            <TextBlock x:Name="DeckWidthText"
+                                                       Grid.Column="1"
+                                                       Text="610 mm"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="19"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#1E536B"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#F8FAFB"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="ZUGABEN / UMSCHLÄGE"
+                                               Style="{StaticResource SectionTitle}"/>
+
+                                    <TextBlock Text="Zugabe oben"
+                                               Margin="0,10,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="44"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TopAllowanceBox"
+                                                 Text="25"
+                                                 TextChanged="CladdingValue_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+
+                                    <TextBlock Text="Zugabe unten"
+                                               Margin="0,10,0,5"
+                                               FontSize="11"
+                                               Foreground="#5D6B76"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="44"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="BottomAllowanceBox"
+                                                 Text="30"
+                                                 TextChanged="CladdingValue_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+
+                                    <TextBlock x:Name="CladdingSummaryText"
+                                               Margin="0,12,0,0"
+                                               FontSize="10.5"
+                                               Foreground="#7B8892"
+                                               TextWrapping="Wrap"
+                                               Text="670 mm Coil → 610 mm Deckbreite · oben 25 mm · unten 30 mm"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
                         <Border Background="#F8FAFB"
                                 BorderBrush="#E0E6EB"
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 Padding="11"
-                                Margin="0,15,0,0">
+                                Margin="0,16,0,0">
                             <StackPanel>
                                 <TextBlock Text="3D-Steuerung"
                                            FontSize="11"
