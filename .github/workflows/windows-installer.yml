@@ -61,7 +61,7 @@ jobs:
         run: dotnet restore Fassadenplaner.csproj
 
       - name: Build
-        run: dotnet build Fassadenplaner.csproj -c Release --no-restore
+        run: dotnet build Fassadenplaner.csproj -c Release --no-restore -p:Version=0.1.${{ github.run_number }} -p:AssemblyVersion=0.1.${{ github.run_number }}.0 -p:FileVersion=0.1.${{ github.run_number }}.0
 
       - name: Publish standalone Windows app
         run: >
@@ -69,6 +69,9 @@ jobs:
           -c Release
           -r win-x64
           --self-contained true
+          -p:Version=0.1.${{ github.run_number }}
+          -p:AssemblyVersion=0.1.${{ github.run_number }}.0
+          -p:FileVersion=0.1.${{ github.run_number }}.0
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish/Fassadenplaner-win-x64
@@ -128,6 +131,7 @@ jobs:
           @"
           Fassadenplaner Local Build
           GitHub Run: ${{ github.run_number }}
+          Version: $version
           Branch: main
           Commit: $codeCommit
           Built: $(Get-Date -Format "dd.MM.yyyy HH:mm:ss")
