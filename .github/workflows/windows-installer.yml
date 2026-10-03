@@ -104,6 +104,7 @@ jobs:
         shell: powershell
         run: |
           $target = "C:\\Fassadenplaner\\Builds"
+          $version = "0.1.${{ github.run_number }}"
           New-Item -ItemType Directory -Force -Path $target | Out-Null
 
           $installer = Get-ChildItem "publish\\installer\\*.exe" |
@@ -127,7 +128,15 @@ jobs:
           Copy-Item $portableExe.FullName $portableVersionedPath -Force
 
           $portableLatestPath = Join-Path $target "Fassadenplaner-LATEST.exe"
-          Copy-Item $portableExe.FullName $portableLatestPath -Force
+
+          # Die portable LATEST.exe kann gerade geöffnet sein. Das darf den
+          # eigentlichen Installer-Build nicht mehr fehlschlagen lassen.
+          try {
+            Copy-Item $portableExe.FullName $portableLatestPath -Force -ErrorAction Stop
+          }
+          catch {
+            Write-Warning "Portable LATEST.exe ist gerade in Benutzung und wurde nicht überschrieben. Der versionierte Build und der Installer sind trotzdem fertig."
+          }
 
           $codeCommit = git rev-parse HEAD
 
