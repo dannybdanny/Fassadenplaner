@@ -969,49 +969,72 @@ public partial class MainWindow : Window
 
         var isLeft = _selectedSurfaceKey == "left-cheek";
         var isRight = _selectedSurfaceKey == "right-cheek";
+        var isFront = _selectedSurfaceKey == "front";
 
-        if (!isLeft && !isRight)
+        if (!isLeft && !isRight && !isFront)
         {
-            SeamSurfaceText.Text = "Bitte linke oder rechte Gaubenwange anklicken";
+            SeamSurfaceText.Text =
+                "Bitte Gaubenwange oder Gaubenfront anklicken";
             SeamDirectionText.Text = "–";
             PanCountText.Text = "–";
             LastPanWidthText.Text = "–";
             _selectedSeamPanNumber = null;
             SelectedPanCutTitle.Text = "Zuschnitt";
-            SelectedPanCutSubtitle.Text = "Schar anklicken · Doppelklick öffnet 2D";
+            SelectedPanCutSubtitle.Text =
+                "Schar anklicken · Doppelklick öffnet 2D";
             StartPanRawWidthText.Text = "–";
             StartPanOuterHeightText.Text = "–";
             StartPanInnerHeightText.Text = "–";
             return;
         }
 
-        SeamSurfaceText.Text =
-            isLeft ? "Gaubenwange links" : "Gaubenwange rechts";
+        SeamSurfaceText.Text = isLeft
+            ? "Gaubenwange links"
+            : isRight
+                ? "Gaubenwange rechts"
+                : "Gaubenfront";
 
-        SeamDirectionText.Text =
-            isLeft ? "rechts → links" : "links → rechts";
+        SeamDirectionText.Text = isLeft
+            ? "rechts → links"
+            : "links → rechts";
 
         UpdateSeamDistributionControls();
 
-        var startWidth = UseStandardSeamDistribution
-            ? GetMaximumStartDeckWidthMm()
-            : GetChosenSeamDeckWidthMm();
+        var surfaceKey = _selectedSurfaceKey!;
+        var settings = GetOrCreateSeamSettings(surfaceKey);
 
-        var regularWidth = UseStandardSeamDistribution
-            ? GetMaximumRegularDeckWidthMm()
-            : GetChosenSeamDeckWidthMm();
+        double startWidth;
+        double regularWidth;
+
+        if (settings.Mode == "standard")
+        {
+            startWidth = isFront
+                ? GetMaximumRegularDeckWidthMm()
+                : GetMaximumStartDeckWidthMm();
+            regularWidth = GetMaximumRegularDeckWidthMm();
+        }
+        else
+        {
+            startWidth = GetChosenSeamDeckWidthMm(surfaceKey);
+            regularWidth = startWidth;
+        }
 
         StartPanWidthText.Text =
             startWidth > 0 ? $"{startWidth:0.#} mm" : "–";
         RegularPanWidthText.Text =
             regularWidth > 0 ? $"{regularWidth:0.#} mm" : "–";
-        var pans = CalculateCheekSeamPans();
+
+        var pans = CalculateSurfaceSeamPans(surfaceKey);
+
         PanCountText.Text =
-            pans.Count > 0 ? pans.Count.ToString(CultureInfo.InvariantCulture) : "–";
+            pans.Count > 0
+                ? pans.Count.ToString(CultureInfo.InvariantCulture)
+                : "–";
 
         if (pans.Count > 0)
         {
             var last = pans[^1];
+
             LastPanWidthText.Text =
                 $"{(last.VisibleEndMm - last.VisibleStartMm):0.#} mm";
 
@@ -1021,12 +1044,16 @@ public partial class MainWindow : Window
                 _selectedSeamPanNumber = selected.Number;
 
             var raw = CalculatePanRawGeometry(selected);
+            var prefix = GetSurfacePanPrefix(surfaceKey);
 
             SelectedPanCutTitle.Text =
-                $"Zuschnitt · Schar {selected.Number}";
-            SelectedPanCutSubtitle.Text = selected.IsStart
-                ? "Startschar · Unterfalz auf beiden Seiten · Doppelklick öffnet 2D"
-                : "Oberfalz an der Startseite · Unterfalz an der Endseite · Doppelklick öffnet 2D";
+                $"Zuschnitt · {prefix} {selected.Number}";
+
+            SelectedPanCutSubtitle.Text = isFront
+                ? "Gaubenfront · Doppelklick öffnet 2D"
+                : selected.IsStart
+                    ? "Startschar · Unterfalz auf beiden Seiten · Doppelklick öffnet 2D"
+                    : "Oberfalz an der Startseite · Unterfalz an der Endseite · Doppelklick öffnet 2D";
 
             StartPanRawWidthText.Text =
                 $"{raw.RawWidthMm:0.#} mm";
@@ -1038,6 +1065,7 @@ public partial class MainWindow : Window
         else
         {
             LastPanWidthText.Text = "–";
+            StartPanRawWidthText.Text = "–";
             StartPanOuterHeightText.Text = "–";
             StartPanInnerHeightText.Text = "–";
         }
@@ -1052,12 +1080,19 @@ public partial class MainWindow : Window
         double StartFoldMm,
         double EndFoldMm,
         string StartFoldName,
-        string EndFoldName);
+        string EndFoldName,
+        double? TopApexOffsetMm = null,
+        double? TopApexHeightMm = null,
+        bool ShowTopAngle = false);
 
     private PanRawGeometry CalculatePanRawGeometry(SeamPan pan)
     {
-        var topAllowance = Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0);
-        var bottomAllowance = Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0);
+        var surfaceKey = _selectedSurfaceKey ?? "right-cheek";
+
+        var topAllowance =
+            Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0);
+        var bottomAllowance =
+            Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0);
 
         var underFold = ManualProfileRadio?.IsChecked == true
             ? Math.Max(ParseMillimeters(ManualLowerFoldBox?.Text), 0)
@@ -1067,11 +1102,85 @@ public partial class MainWindow : Window
             ? Math.Max(ParseMillimeters(ManualUpperFoldBox?.Text), 0)
             : 35.0;
 
-        var startFold = pan.IsStart ? underFold : overFold;
+        // Wangen-Startschar: Unterfalz auf beiden Seiten.
+        // Frontscharen verwenden die normale Oberfalz/Unterfalz-Folge.
+        var startFold =
+            surfaceKey is "left-cheek" or "right-cheek" && pan.IsStart
+                ? underFold
+                : overFold;
+
         var endFold = underFold;
 
         var rawStart = pan.VisibleStartMm - startFold;
         var rawEnd = pan.VisibleEndMm + endFold;
+
+        if (surfaceKey == "front")
+        {
+            var bottomCut = -bottomAllowance;
+
+            double TopLine(double u)
+            {
+                if (!HasGable || _widthMm <= 0)
+                    return _frontWallHeightMm;
+
+                var half = _widthMm / 2.0;
+                var slope = _gableHeightMm / Math.Max(half, 0.001);
+
+                return u <= half
+                    ? _frontWallHeightMm + slope * u
+                    : _frontWallHeightMm + slope * (_widthMm - u);
+            }
+
+            double TopSlopeAt(double u)
+            {
+                if (!HasGable || _widthMm <= 0)
+                    return 0;
+
+                var half = _widthMm / 2.0;
+                var slope = _gableHeightMm / Math.Max(half, 0.001);
+                return u <= half ? slope : -slope;
+            }
+
+            double TopCut(double u)
+            {
+                var slope = TopSlopeAt(u);
+                var normalAllowance =
+                    topAllowance * Math.Sqrt(1 + slope * slope);
+
+                return TopLine(u) + normalAllowance;
+            }
+
+            var startTop = TopCut(rawStart);
+            var endTop = TopCut(rawEnd);
+
+            double? apexOffset = null;
+            double? apexHeight = null;
+
+            if (HasGable)
+            {
+                var apexU = _widthMm / 2.0;
+
+                if (rawStart < apexU && rawEnd > apexU)
+                {
+                    apexOffset = apexU - rawStart;
+                    apexHeight = TopCut(apexU) - bottomCut;
+                }
+            }
+
+            return new PanRawGeometry(
+                RawWidthMm: Math.Max(rawEnd - rawStart, 0),
+                StartHeightMm: Math.Max(startTop - bottomCut, 0),
+                EndHeightMm: Math.Max(endTop - bottomCut, 0),
+                BottomDeltaMm: 0,
+                TopDeltaMm: endTop - startTop,
+                StartFoldMm: startFold,
+                EndFoldMm: endFold,
+                StartFoldName: "Oberfalz",
+                EndFoldName: "Unterfalz",
+                TopApexOffsetMm: apexOffset,
+                TopApexHeightMm: apexHeight,
+                ShowTopAngle: HasGable);
+        }
 
         var topSlope = HasShedRoof
             ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
@@ -1079,41 +1188,50 @@ public partial class MainWindow : Window
 
         var bottomSlope = Math.Tan(DegToRad(_roofPitchDeg));
 
-        double TopLine(double u) =>
+        double CheekTopLine(double u) =>
             _frontWallHeightMm + topSlope * u;
 
-        double BottomLine(double u) =>
+        double CheekBottomLine(double u) =>
             bottomSlope * u;
 
-        var topOffset = topAllowance * Math.Sqrt(1 + topSlope * topSlope);
-        var bottomOffset = bottomAllowance * Math.Sqrt(1 + bottomSlope * bottomSlope);
+        var topOffset =
+            topAllowance * Math.Sqrt(1 + topSlope * topSlope);
+        var bottomOffset =
+            bottomAllowance * Math.Sqrt(1 + bottomSlope * bottomSlope);
 
-        double TopCut(double u) => TopLine(u) + topOffset;
-        double BottomCut(double u) => BottomLine(u) - bottomOffset;
+        double CheekTopCut(double u) => CheekTopLine(u) + topOffset;
+        double CheekBottomCut(double u) => CheekBottomLine(u) - bottomOffset;
 
-        var startTop = TopCut(rawStart);
-        var startBottom = BottomCut(rawStart);
-        var endTop = TopCut(rawEnd);
-        var endBottom = BottomCut(rawEnd);
+        var cheekStartTop = CheekTopCut(rawStart);
+        var cheekStartBottom = CheekBottomCut(rawStart);
+        var cheekEndTop = CheekTopCut(rawEnd);
+        var cheekEndBottom = CheekBottomCut(rawEnd);
 
         return new PanRawGeometry(
             RawWidthMm: Math.Max(rawEnd - rawStart, 0),
-            StartHeightMm: Math.Max(startTop - startBottom, 0),
-            EndHeightMm: Math.Max(endTop - endBottom, 0),
-            BottomDeltaMm: endBottom - startBottom,
-            TopDeltaMm: endTop - startTop,
+            StartHeightMm:
+                Math.Max(cheekStartTop - cheekStartBottom, 0),
+            EndHeightMm:
+                Math.Max(cheekEndTop - cheekEndBottom, 0),
+            BottomDeltaMm: cheekEndBottom - cheekStartBottom,
+            TopDeltaMm: cheekEndTop - cheekStartTop,
             StartFoldMm: startFold,
             EndFoldMm: endFold,
-            StartFoldName: pan.IsStart ? "Unterfalz" : "Oberfalz",
-            EndFoldName: "Unterfalz");
+            StartFoldName:
+                pan.IsStart ? "Unterfalz" : "Oberfalz",
+            EndFoldName: "Unterfalz",
+            ShowTopAngle: HasShedRoof);
     }
 
     private SeamPan? GetSelectedSeamPan()
     {
-        if (_selectedSeamPanNumber is null)
+        if (_selectedSeamPanNumber is null ||
+            _selectedSurfaceKey is not ("left-cheek" or "right-cheek" or "front"))
+        {
             return null;
+        }
 
-        return CalculateCheekSeamPans()
+        return CalculateSurfaceSeamPans(_selectedSurfaceKey)
             .FirstOrDefault(p => p.Number == _selectedSeamPanNumber.Value);
     }
 
@@ -1131,42 +1249,59 @@ public partial class MainWindow : Window
 
     private void OpenSelectedSeamCutWindow()
     {
+        if (_selectedSurfaceKey is not ("left-cheek" or "right-cheek" or "front"))
+            return;
+
         var pan = GetSelectedSeamPan();
         if (pan is null)
             return;
 
         var raw = CalculatePanRawGeometry(pan);
-        var isLeft = _selectedSurfaceKey == "left-cheek";
-        var surfaceName = isLeft
-            ? "Gaubenwange links"
-            : "Gaubenwange rechts";
+        var surfaceKey = _selectedSurfaceKey;
 
-        var direction = isLeft
+        var surfaceName = surfaceKey switch
+        {
+            "left-cheek" => "Gaubenwange links",
+            "right-cheek" => "Gaubenwange rechts",
+            "front" => "Gaubenfront",
+            _ => "Gaubenfläche"
+        };
+
+        var direction = surfaceKey == "left-cheek"
             ? "rechts → links"
             : "links → rechts";
 
         var data = new SeamCutData(
+            SurfaceKey: surfaceKey,
+            PanCode: $"{GetSurfacePanPrefix(surfaceKey)} {pan.Number}",
             SurfaceName: surfaceName,
             PanNumber: pan.Number,
             IsStartPan: pan.IsStart,
             RawWidthMm: raw.RawWidthMm,
-            VisibleWidthMm: pan.VisibleEndMm - pan.VisibleStartMm,
+            VisibleWidthMm:
+                pan.VisibleEndMm - pan.VisibleStartMm,
             StartHeightMm: raw.StartHeightMm,
             EndHeightMm: raw.EndHeightMm,
             BottomDeltaMm: raw.BottomDeltaMm,
             TopDeltaMm: raw.TopDeltaMm,
             StartFoldMm: raw.StartFoldMm,
             EndFoldMm: raw.EndFoldMm,
-            TopAllowanceMm: Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0),
-            BottomAllowanceMm: Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0),
+            TopAllowanceMm:
+                Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0),
+            BottomAllowanceMm:
+                Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0),
             StartFoldName: raw.StartFoldName,
             EndFoldName: raw.EndFoldName,
-            DeckDirection: direction);
+            DeckDirection: direction,
+            TopApexOffsetMm: raw.TopApexOffsetMm,
+            TopApexHeightMm: raw.TopApexHeightMm,
+            ShowTopAngle: raw.ShowTopAngle);
 
         var window = new SeamCutWindow(data)
         {
             Owner = this
         };
+
         window.Show();
     }
 
@@ -2109,8 +2244,7 @@ public partial class MainWindow : Window
                         panHit.Value.PanNumber;
                     _lastSeamPanClickUtc = now;
 
-                    if (isDoubleClick &&
-                        panHit.Value.SurfaceKey is "left-cheek" or "right-cheek")
+                    if (isDoubleClick)
                     {
                         _lastClickedSeamPanNumber = null;
                         _lastSeamPanClickUtc = DateTime.MinValue;
