@@ -31,9 +31,8 @@ public partial class MainWindow : Window
     private readonly List<(Point3D Start, Point3D End, string Key)> _dimensionHitSegments = new();
     private readonly Dictionary<GeometryModel3D, string> _surfaceKeys = new();
     private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
-    private readonly Dictionary<GeometryModel3D, int> _seamPanModels = new();
-    private readonly Dictionary<int, Point3D> _seamPanLabelAnchors = new();
-    private string _seamPanLabelPrefix = string.Empty;
+    private readonly Dictionary<GeometryModel3D, (string SurfaceKey, int PanNumber)> _seamPanModels = new();
+    private readonly Dictionary<string, Point3D> _seamPanLabelAnchors = new();
 
     private string? _selectedSurfaceKey;
 
@@ -600,6 +599,150 @@ public partial class MainWindow : Window
         return settings;
     }
 
+    private double GetSurfaceSeamLengthMm(string surfaceKey)
+        => surfaceKey == "front" ? _widthMm : _depthMm;
+
+    private string GetSurfacePanPrefix(string surfaceKey) => surfaceKey switch
+    {
+        "left-cheek" => "WL",
+        "right-cheek" => "WR",
+        "front" => "GF",
+        _ => "S"
+    };
+
+    private double GetChosenSeamDeckWidthMm(string surfaceKey)
+    {
+        var length = GetSurfaceSeamLengthMm(surfaceKey);
+        var maxUniform = GetMaximumUniformDeckWidthMm();
+        var settings = GetOrCreateSeamSettings(surfaceKey);
+
+        if (length <= 0 || maxUniform <= 0)
+            return 0;
+
+        if (settings.Mode == "equal")
+        {
+            var count = Math.Max(
+                1,
+                (int)Math.Ceiling(length / maxUniform));
+
+            return length / count;
+        }
+
+        if (settings.Mode == "manual")
+        {
+            if (settings.ManualDeckWidthMm <= 0)
+                return maxUniform;
+
+            return Math.Min(settings.ManualDeckWidthMm, maxUniform);
+        }
+
+        return GetMaximumRegularDeckWidthMm();
+    }
+
+    private List<SeamPan> CalculateSurfaceSeamPans(string surfaceKey)
+    {
+        var result = new List<SeamPan>();
+        var length = GetSurfaceSeamLengthMm(surfaceKey);
+
+        if (length <= 0)
+            return result;
+
+        var settings = GetOrCreateSeamSettings(surfaceKey);
+
+        if (settings.Mode == "standard")
+        {
+            if (surfaceKey is "left-cheek" or "right-cheek")
+            {
+                var startWidth = GetMaximumStartDeckWidthMm();
+                var regularWidth = GetMaximumRegularDeckWidthMm();
+
+                if (startWidth <= 0 || regularWidth <= 0)
+                    return result;
+
+                var firstEnd = Math.Min(startWidth, length);
+                result.Add(new SeamPan(1, 0, firstEnd, true));
+
+                var cursor = firstEnd;
+                var number = 2;
+
+                while (cursor < length - 0.01)
+                {
+                    var next = Math.Min(cursor + regularWidth, length);
+                    result.Add(new SeamPan(number++, cursor, next, false));
+                    cursor = next;
+                }
+
+                return result;
+            }
+
+            var frontWidth = GetMaximumRegularDeckWidthMm();
+            if (frontWidth <= 0)
+                return result;
+
+            var frontCursor = 0.0;
+            var frontNumber = 1;
+
+            while (frontCursor < length - 0.01)
+            {
+                var next = Math.Min(frontCursor + frontWidth, length);
+                result.Add(new SeamPan(frontNumber++, frontCursor, next, false));
+                frontCursor = next;
+            }
+
+            return result;
+        }
+
+        var deckWidth = GetChosenSeamDeckWidthMm(surfaceKey);
+        if (deckWidth <= 0)
+            return result;
+
+        if (settings.Mode == "equal")
+        {
+            var count = Math.Max(
+                1,
+                (int)Math.Ceiling(length / deckWidth));
+
+            var equalWidth = length / count;
+
+            for (var i = 0; i < count; i++)
+            {
+                var start = i * equalWidth;
+                var end = i == count - 1
+                    ? length
+                    : (i + 1) * equalWidth;
+
+                result.Add(
+                    new SeamPan(
+                        i + 1,
+                        start,
+                        end,
+                        surfaceKey is "left-cheek" or "right-cheek" && i == 0));
+            }
+
+            return result;
+        }
+
+        var cursorManual = 0.0;
+        var manualNumber = 1;
+
+        while (cursorManual < length - 0.01)
+        {
+            var next = Math.Min(cursorManual + deckWidth, length);
+
+            result.Add(
+                new SeamPan(
+                    manualNumber,
+                    cursorManual,
+                    next,
+                    surfaceKey is "left-cheek" or "right-cheek" && manualNumber == 1));
+
+            cursorManual = next;
+            manualNumber++;
+        }
+
+        return result;
+    }
+
     private void LoadSeamDistributionSettings(string? surfaceKey)
     {
         if (string.IsNullOrWhiteSpace(surfaceKey) ||
@@ -811,86 +954,12 @@ public partial class MainWindow : Window
 
     private List<SeamPan> CalculateCheekSeamPans()
     {
-        var result = new List<SeamPan>();
-        var length = _depthMm;
+        var surfaceKey =
+            _selectedSurfaceKey is "left-cheek" or "right-cheek"
+                ? _selectedSurfaceKey
+                : "right-cheek";
 
-        if (length <= 0)
-            return result;
-
-        if (UseStandardSeamDistribution)
-        {
-            var startWidth = GetMaximumStartDeckWidthMm();
-            var regularWidth = GetMaximumRegularDeckWidthMm();
-
-            if (startWidth <= 0 || regularWidth <= 0)
-                return result;
-
-            var firstEnd = Math.Min(startWidth, length);
-            result.Add(new SeamPan(1, 0, firstEnd, true));
-
-            var cursor = firstEnd;
-            var number = 2;
-
-            while (cursor < length - 0.01)
-            {
-                var next = Math.Min(cursor + regularWidth, length);
-                result.Add(new SeamPan(number++, cursor, next, false));
-                cursor = next;
-            }
-
-            return result;
-        }
-
-        var deckWidth = GetChosenSeamDeckWidthMm();
-
-        if (deckWidth <= 0)
-            return result;
-
-        if (UseEqualSeamDistribution)
-        {
-            var count = Math.Max(
-                1,
-                (int)Math.Ceiling(length / deckWidth));
-
-            var equalWidth = length / count;
-
-            for (var i = 0; i < count; i++)
-            {
-                var start = i * equalWidth;
-                var end = i == count - 1
-                    ? length
-                    : (i + 1) * equalWidth;
-
-                result.Add(
-                    new SeamPan(
-                        i + 1,
-                        start,
-                        end,
-                        i == 0));
-            }
-
-            return result;
-        }
-
-        var cursorManual = 0.0;
-        var manualNumber = 1;
-
-        while (cursorManual < length - 0.01)
-        {
-            var next = Math.Min(cursorManual + deckWidth, length);
-
-            result.Add(
-                new SeamPan(
-                    manualNumber,
-                    cursorManual,
-                    next,
-                    manualNumber == 1));
-
-            cursorManual = next;
-            manualNumber++;
-        }
-
-        return result;
+        return CalculateSurfaceSeamPans(surfaceKey);
     }
 
     private void UpdateSeamPanel()
