@@ -607,6 +607,82 @@
                                 </StackPanel>
                             </Border>
 
+                            <Expander x:Name="ManualFoldDetailsExpander"
+                                      Header="Falzmaße anzeigen"
+                                      Visibility="Collapsed"
+                                      IsExpanded="False"
+                                      Margin="0,0,0,9"
+                                      Foreground="#53636F">
+                                <Border Background="#F7F9FB"
+                                        BorderBrush="#DDE4E9"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,5,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Optional: Deckbreite aus Falzmaßen berechnen"
+                                                   FontSize="10"
+                                                   Foreground="#6F7E89"
+                                                   TextWrapping="Wrap"/>
+
+                                        <Grid Margin="0,7,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Oberfalz / Überdeck"
+                                                           FontSize="9.5"
+                                                           Foreground="#7D8992"/>
+                                                <Grid Margin="0,2,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="32"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="ManualUpperFoldBox"
+                                                             Height="32"
+                                                             Text="45"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="mm"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               FontSize="10"
+                                                               Foreground="#6E7A86"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Unterfalz / Unterdeck"
+                                                           FontSize="9.5"
+                                                           Foreground="#7D8992"/>
+                                                <Grid Margin="0,2,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="32"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="ManualLowerFoldBox"
+                                                             Height="32"
+                                                             Text="35"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="mm"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               FontSize="10"
+                                                               Foreground="#6E7A86"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Button Content="Deckbreite aus Falzmaßen übernehmen"
+                                                Height="31"
+                                                Margin="0,8,0,0"
+                                                Click="ApplyManualFoldDimensions_Click"/>
+                                    </StackPanel>
+                                </Border>
+                            </Expander>
+
                             <Border Background="#F7F9FB"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
