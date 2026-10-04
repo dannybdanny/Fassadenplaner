@@ -219,29 +219,77 @@ public partial class MainWindow : Window
         RecalculateCladding();
     }
 
+    private void ManualFoldValue_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        UpdateManualFoldPreview();
+    }
+
+    private void UpdateManualFoldPreview()
+    {
+        if (CoilWidthBox is null ||
+            ManualUpperFoldBox is null ||
+            ManualLowerFoldBox is null ||
+            ManualDeckCorrectionBox is null ||
+            ManualCalculatedDeckText is null ||
+            ManualActualDeckText is null)
+        {
+            return;
+        }
+
+        var coil = ParseMillimeters(CoilWidthBox.Text);
+        var upperFold = ParseMillimeters(ManualUpperFoldBox.Text);
+        var lowerFold = ParseMillimeters(ManualLowerFoldBox.Text);
+        var correction = ParseSignedMillimeters(ManualDeckCorrectionBox.Text);
+
+        var calculatedDeck = coil - upperFold - lowerFold;
+        var actualDeck = calculatedDeck + correction;
+
+        if (coil <= 0 ||
+            upperFold < 0 ||
+            lowerFold < 0 ||
+            calculatedDeck <= 0 ||
+            actualDeck <= 0 ||
+            actualDeck >= coil)
+        {
+            ManualCalculatedDeckText.Text = "–";
+            ManualActualDeckText.Text = "–";
+            return;
+        }
+
+        ManualCalculatedDeckText.Text = $"{calculatedDeck:0.#} mm";
+        ManualActualDeckText.Text = $"{actualDeck:0.#} mm";
+    }
+
     private void ApplyManualFoldDimensions_Click(object sender, RoutedEventArgs e)
     {
         var coil = ParseMillimeters(CoilWidthBox.Text);
         var upperFold = ParseMillimeters(ManualUpperFoldBox.Text);
         var lowerFold = ParseMillimeters(ManualLowerFoldBox.Text);
+        var correction = ParseSignedMillimeters(ManualDeckCorrectionBox.Text);
+
+        var calculatedDeck = coil - upperFold - lowerFold;
+        var actualDeck = calculatedDeck + correction;
 
         if (coil <= 0 ||
             upperFold < 0 ||
             lowerFold < 0 ||
-            upperFold + lowerFold >= coil)
+            calculatedDeck <= 0 ||
+            actualDeck <= 0 ||
+            actualDeck >= coil)
         {
             MessageBox.Show(
-                "Bitte gültige Falzmaße eingeben. Oberfalz und Unterfalz müssen zusammen kleiner als die Coilbreite sein.",
+                "Bitte gültige Falzmaße und eine plausible Korrektur eingeben.",
                 "Ungültige Falzmaße",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
         }
 
-        var deckWidth = coil - upperFold - lowerFold;
-
         DeckWidthBox.Text =
-            deckWidth.ToString("0.#", CultureInfo.InvariantCulture);
+            actualDeck.ToString("0.#", CultureInfo.InvariantCulture);
 
         RecalculateCladding();
     }
@@ -252,6 +300,9 @@ public partial class MainWindow : Window
             return;
 
         RecalculateCladding();
+
+        if (ManualFoldDetailsExpander?.Visibility == Visibility.Visible)
+            UpdateManualFoldPreview();
     }
 
     private void RecalculateCladding()
