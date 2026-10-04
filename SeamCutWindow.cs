@@ -456,7 +456,7 @@ public sealed class SeamCutWindow : Window
             _data.BottomAllowanceMm * scale);
 
         // Profilansicht ganz oben im Zeichenbereich.
-        var profileY = 36.0;
+        var profileY = 42.0;
 
         DrawProfileView(
             x0,
@@ -468,11 +468,12 @@ public sealed class SeamCutWindow : Window
             rightFoldName);
 
         // "oben +..." direkt unter der Profilansicht.
-        var topAllowanceLegendY = profileY + 42;
-
         // Maßkette kompakt und direkt über der Schar.
         var topDimensionY =
-            Math.Max(topAllowanceLegendY + 26, Math.Min(leftTop, rightTop) - 22);
+            Math.Max(profileY + 92, Math.Min(leftTop, rightTop) - 22);
+
+        // "oben +..." sitzt direkt über der Maßkette.
+        var topAllowanceLegendY = topDimensionY - 28;
 
         DrawDimensionSegment(
             x0,
@@ -532,37 +533,41 @@ public sealed class SeamCutWindow : Window
         string leftFoldName,
         string rightFoldName)
     {
-        var stroke = new SolidColorBrush(Color.FromRgb(36, 55, 70));
-        var accent = new SolidColorBrush(Color.FromRgb(72, 119, 145));
+        // Diese Ansicht ist absichtlich NICHT maßstäblich.
+        // Sie soll nur auf einen Blick zeigen, wo Oberfalz und Unterfalz liegen.
+        var center = (x0 + x1) / 2.0;
+        var profileWidth = Math.Min(190.0, Math.Max(150.0, (x1 - x0) * 0.9));
 
-        // Kleine echte Profilansicht: Falze stehen sichtbar hoch,
-        // die Deckfläche liegt dazwischen.
-        var profileLeft = x0 + 18;
-        var profileRight = x1 - 18;
-        var deckLeft = profileLeft + 26;
-        var deckRight = profileRight - 26;
+        var leftBase = center - profileWidth / 2.0;
+        var rightBase = center + profileWidth / 2.0;
+
+        var deckLeft = leftBase + 28;
+        var deckRight = rightBase - 28;
+
+        var stroke = new SolidColorBrush(Color.FromRgb(36, 55, 70));
+        var accent = new SolidColorBrush(Color.FromRgb(54, 111, 142));
 
         // Deckfläche.
         _drawingCanvas.Children.Add(new Line
         {
             X1 = deckLeft,
             X2 = deckRight,
-            Y1 = y + 16,
-            Y2 = y + 16,
+            Y1 = y,
+            Y2 = y,
             Stroke = stroke,
-            StrokeThickness = 2.0
+            StrokeThickness = 2.2
         });
 
-        DrawStandingSeamProfile(
+        DrawSchematicFold(
             deckLeft,
-            y + 16,
+            y,
             leftFoldName,
             isLeftSide: true,
             accent);
 
-        DrawStandingSeamProfile(
+        DrawSchematicFold(
             deckRight,
-            y + 16,
+            y,
             rightFoldName,
             isLeftSide: false,
             accent);
@@ -570,34 +575,34 @@ public sealed class SeamCutWindow : Window
         var caption = new TextBlock
         {
             Text = "Profilansicht",
-            FontSize = 8.5,
+            FontSize = 8.2,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(124, 137, 147))
+            Foreground = new SolidColorBrush(Color.FromRgb(126, 139, 149))
         };
 
         caption.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(
-            caption,
-            (profileLeft + profileRight) / 2 - caption.DesiredSize.Width / 2);
-        Canvas.SetTop(caption, y - 12);
+        Canvas.SetLeft(caption, center - caption.DesiredSize.Width / 2);
+        Canvas.SetTop(caption, y - 34);
         _drawingCanvas.Children.Add(caption);
     }
 
-    private void DrawStandingSeamProfile(
+    private void DrawSchematicFold(
         double baseX,
         double baseY,
         string foldName,
         bool isLeftSide,
-        Brush accent)
+        Brush stroke)
     {
         var isUpper = foldName.Contains(
             "Ober",
             StringComparison.OrdinalIgnoreCase);
 
         var outward = isLeftSide ? -1.0 : 1.0;
-        var rise = isUpper ? 28.0 : 22.0;
-        var topReturn = isUpper ? 18.0 : 12.0;
-        var downTurn = isUpper ? 8.0 : 5.0;
+
+        // bewusst überzeichnet, damit die Profilart klar lesbar ist
+        var rise = isUpper ? 30.0 : 23.0;
+        var head = isUpper ? 21.0 : 13.0;
+        var drop = isUpper ? 10.0 : 6.0;
 
         // senkrechte Aufkantung
         _drawingCanvas.Children.Add(new Line
@@ -606,45 +611,67 @@ public sealed class SeamCutWindow : Window
             X2 = baseX,
             Y1 = baseY,
             Y2 = baseY - rise,
-            Stroke = accent,
-            StrokeThickness = 2.1
+            Stroke = stroke,
+            StrokeThickness = 2.4
         });
 
-        // waagerechte Kopfkantung nach außen
+        // Kopfkantung
         _drawingCanvas.Children.Add(new Line
         {
             X1 = baseX,
-            X2 = baseX + outward * topReturn,
+            X2 = baseX + outward * head,
             Y1 = baseY - rise,
             Y2 = baseY - rise,
-            Stroke = accent,
-            StrokeThickness = 2.1
+            Stroke = stroke,
+            StrokeThickness = 2.4
         });
 
-        // kleine Rückkantung nach unten
+        // Rückkantung
         _drawingCanvas.Children.Add(new Line
         {
-            X1 = baseX + outward * topReturn,
-            X2 = baseX + outward * topReturn,
+            X1 = baseX + outward * head,
+            X2 = baseX + outward * head,
             Y1 = baseY - rise,
-            Y2 = baseY - rise + downTurn,
-            Stroke = accent,
-            StrokeThickness = 2.1
+            Y2 = baseY - rise + drop,
+            Stroke = stroke,
+            StrokeThickness = 2.4
         });
 
-        // Beim Oberfalz zusätzliche kurze Überdeckung.
         if (isUpper)
         {
+            // Oberfalz bekommt zusätzlich eine klar erkennbare Überdeckung.
             _drawingCanvas.Children.Add(new Line
             {
-                X1 = baseX + outward * topReturn,
-                X2 = baseX + outward * (topReturn - 6),
-                Y1 = baseY - rise + downTurn,
-                Y2 = baseY - rise + downTurn,
-                Stroke = accent,
-                StrokeThickness = 2.1
+                X1 = baseX + outward * head,
+                X2 = baseX + outward * (head - 8),
+                Y1 = baseY - rise + drop,
+                Y2 = baseY - rise + drop,
+                Stroke = stroke,
+                StrokeThickness = 2.4
             });
         }
+
+        // kleine Kennzeichnung direkt am Profil, damit man die Seite sofort erkennt
+        var shortLabel = isUpper ? "O" : "U";
+        var label = new Border
+        {
+            Background = Brushes.White,
+            Padding = new Thickness(2, 0, 2, 0),
+            Child = new TextBlock
+            {
+                Text = shortLabel,
+                FontSize = 8.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(54, 111, 142))
+            }
+        };
+
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var labelX = baseX + outward * (head + 10);
+        Canvas.SetLeft(label, labelX - label.DesiredSize.Width / 2);
+        Canvas.SetTop(label, baseY - rise - 4);
+        _drawingCanvas.Children.Add(label);
     }
 
     private void DrawFoldBand(Point p1, Point p2, Point p3, Point p4)
@@ -749,7 +776,7 @@ public sealed class SeamCutWindow : Window
         label.Child = new TextBlock
         {
             Text = text,
-            FontSize = 8.3,
+            FontSize = 7.8,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(55, 69, 79)),
             TextAlignment = TextAlignment.Center
