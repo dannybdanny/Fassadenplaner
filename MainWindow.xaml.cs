@@ -432,6 +432,25 @@ public partial class MainWindow : Window
             UpdateSeamPanel();
     }
 
+    private static double ParseSignedMillimeters(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return 0;
+
+        var normalized = text
+            .Replace("mm", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim()
+            .Replace(',', '.');
+
+        return double.TryParse(
+            normalized,
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
+    }
+
     private static double ParseMillimeters(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
