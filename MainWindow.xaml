@@ -1046,6 +1046,90 @@
                                     Padding="10"
                                     Margin="0,0,0,9">
                                 <StackPanel>
+                                    <TextBlock Text="Verteilung"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#53636F"/>
+
+                                    <RadioButton x:Name="EqualSeamDistributionRadio"
+                                                 GroupName="SeamDistribution"
+                                                 IsChecked="True"
+                                                 Margin="0,7,0,0"
+                                                 Checked="SeamDistributionMode_Checked">
+                                        <StackPanel>
+                                            <TextBlock Text="Gleichmäßig verteilen"
+                                                       FontSize="10.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#334753"/>
+                                            <TextBlock Text="Deckmaß wird automatisch passend zur Fläche gewählt"
+                                                       Margin="0,1,0,0"
+                                                       FontSize="9"
+                                                       Foreground="#87939C"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <RadioButton x:Name="ManualSeamDistributionRadio"
+                                                 GroupName="SeamDistribution"
+                                                 Margin="0,7,0,0"
+                                                 Checked="SeamDistributionMode_Checked">
+                                        <StackPanel>
+                                            <TextBlock Text="Deckbreite manuell"
+                                                       FontSize="10.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#334753"/>
+                                            <TextBlock Text="Gewünschtes sichtbares Deckmaß vorgeben"
+                                                       Margin="0,1,0,0"
+                                                       FontSize="9"
+                                                       Foreground="#87939C"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <Grid x:Name="ManualSeamDeckWidthPanel"
+                                          Margin="20,7,0,0"
+                                          Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="36"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="ManualSeamDeckWidthBox"
+                                                 Height="31"
+                                                 Text="420"
+                                                 TextChanged="ManualSeamDeckWidth_TextChanged"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="mm"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="#6E7A86"/>
+                                    </Grid>
+
+                                    <Grid Margin="20,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="SeamDistributionHintText"
+                                                   Text="Automatisches Deckmaß"
+                                                   FontSize="9.5"
+                                                   Foreground="#7D8992"/>
+                                        <TextBlock x:Name="SeamDistributionDeckWidthText"
+                                                   Grid.Column="1"
+                                                   Text="–"
+                                                   FontSize="10.5"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#31566B"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#F7F9FB"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,9">
+                                <StackPanel>
                                     <TextBlock Text="Einteilung"
                                                FontSize="11"
                                                FontWeight="SemiBold"
