@@ -692,9 +692,8 @@ public sealed class SeamCutWindow : Window
     {
         var label = new Border
         {
-            Background =
-                new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)),
-            Padding = new Thickness(3, 1, 3, 1),
+            Background = Brushes.Transparent,
+            Padding = new Thickness(1, 0, 1, 0),
             Child = new TextBlock
             {
                 Text = text,
@@ -798,11 +797,11 @@ public sealed class SeamCutWindow : Window
 
         if (isUpper)
         {
-            // Oberfalz: höher und mit klar erkennbarer Überdeckung.
-            var rise = 30.0;
-            var head = 20.0;
+            // Oberfalz schematisch:
+            // 2,5 cm hoch -> 1 cm nach außen -> 1 cm nach unten.
+            var rise = 25.0;
+            var head = 10.0;
             var drop = 10.0;
-            var overlap = 9.0;
 
             _drawingCanvas.Children.Add(new Line
             {
@@ -829,16 +828,6 @@ public sealed class SeamCutWindow : Window
                 X1 = baseX + outward * head,
                 X2 = baseX + outward * head,
                 Y1 = baseY - rise,
-                Y2 = baseY - rise + drop,
-                Stroke = stroke,
-                StrokeThickness = 2.4
-            });
-
-            _drawingCanvas.Children.Add(new Line
-            {
-                X1 = baseX + outward * head,
-                X2 = baseX + outward * (head - overlap),
-                Y1 = baseY - rise + drop,
                 Y2 = baseY - rise + drop,
                 Stroke = stroke,
                 StrokeThickness = 2.4
