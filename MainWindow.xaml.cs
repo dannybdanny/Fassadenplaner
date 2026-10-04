@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     private Point3D _cameraTarget = new(0, 1.2, 0);
 
     private UpdateInfo? _pendingUpdate;
+    private bool _updatingCladding;
 
     public MainWindow()
     {
@@ -190,6 +191,25 @@ public partial class MainWindow : Window
         RecalculateCladding();
     }
 
+    private void CladdingMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded || DeckWidthBox is null)
+            return;
+
+        var machine = MachineProfileRadio.IsChecked == true;
+
+        DeckWidthBox.IsReadOnly = machine;
+        DeckWidthBox.Background = machine
+            ? new SolidColorBrush(Color.FromRgb(241, 244, 246))
+            : Brushes.White;
+
+        CladdingModeHintText.Text = machine
+            ? "Winkelstehfalz 25 mm · maschinell profiliert · ca. 70 mm Falzverlust"
+            : "Handgekantet · tatsächliche Deckbreite selbst eintragen";
+
+        RecalculateCladding();
+    }
+
     private void CladdingValue_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (!IsLoaded)
@@ -200,7 +220,8 @@ public partial class MainWindow : Window
 
     private void RecalculateCladding()
     {
-        if (CoilWidthBox is null ||
+        if (_updatingCladding ||
+            CoilWidthBox is null ||
             DeckWidthBox is null ||
             TopAllowanceBox is null ||
             BottomAllowanceBox is null)
@@ -208,34 +229,66 @@ public partial class MainWindow : Window
             return;
         }
 
-        var coil = ParseMillimeters(CoilWidthBox.Text);
-        var deckWidth = ParseMillimeters(DeckWidthBox.Text);
-        var top = ParseMillimeters(TopAllowanceBox.Text);
-        var bottom = ParseMillimeters(BottomAllowanceBox.Text);
-
-        if (coil <= 0 ||
-            deckWidth <= 0 ||
-            deckWidth >= coil)
+        try
         {
-            FoldLossText.Text = "–";
+            _updatingCladding = true;
+
+            var coil = ParseMillimeters(CoilWidthBox.Text);
+            var top = ParseMillimeters(TopAllowanceBox.Text);
+            var bottom = ParseMillimeters(BottomAllowanceBox.Text);
+
+            var machine = MachineProfileRadio?.IsChecked == true;
+            double deckWidth;
+
+            if (machine)
+            {
+                const double machineFoldLossMm = 70.0;
+                deckWidth = coil - machineFoldLossMm;
+
+                if (coil > machineFoldLossMm)
+                {
+                    DeckWidthBox.Text =
+                        deckWidth.ToString("0.#", CultureInfo.InvariantCulture);
+                }
+            }
+            else
+            {
+                deckWidth = ParseMillimeters(DeckWidthBox.Text);
+            }
+
+            if (coil <= 0 ||
+                deckWidth <= 0 ||
+                deckWidth >= coil)
+            {
+                FoldLossText.Text = "–";
+                FoldLossText.Foreground =
+                    new SolidColorBrush(Color.FromRgb(173, 66, 66));
+
+                CladdingSummaryText.Text = machine
+                    ? "Bitte eine gültige Coilbreite eingeben."
+                    : "Bitte gültige Werte eingeben. Die Deckbreite muss kleiner als die Coilbreite sein.";
+                return;
+            }
+
+            var foldLoss = coil - deckWidth;
+
+            FoldLossText.Text = $"{foldLoss:0.#} mm";
             FoldLossText.Foreground =
-                new SolidColorBrush(Color.FromRgb(173, 66, 66));
+                new SolidColorBrush(Color.FromRgb(49, 86, 107));
+
+            var modeText = machine
+                ? "maschinell"
+                : "handgekantet";
 
             CladdingSummaryText.Text =
-                "Bitte gültige Werte eingeben. Die Deckbreite muss kleiner als die Coilbreite sein.";
-            return;
+                $"{coil:0.#} mm Coil · {deckWidth:0.#} mm Deckbreite · " +
+                $"{foldLoss:0.#} mm Falzverlust · {modeText} · " +
+                $"oben {Math.Max(top, 0):0.#} mm · unten {Math.Max(bottom, 0):0.#} mm";
         }
-
-        var foldLoss = coil - deckWidth;
-
-        FoldLossText.Text = $"{foldLoss:0.#} mm";
-        FoldLossText.Foreground =
-            new SolidColorBrush(Color.FromRgb(49, 86, 107));
-
-        CladdingSummaryText.Text =
-            $"{coil:0.#} mm Coil · {deckWidth:0.#} mm Deckbreite · " +
-            $"{foldLoss:0.#} mm Falzverlust · " +
-            $"oben {Math.Max(top, 0):0.#} mm · unten {Math.Max(bottom, 0):0.#} mm";
+        finally
+        {
+            _updatingCladding = false;
+        }
     }
 
     private static double ParseMillimeters(string? text)
