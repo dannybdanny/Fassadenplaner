@@ -207,6 +207,42 @@ public partial class MainWindow : Window
             ? "Winkelstehfalz 25 mm · maschinell profiliert · ca. 70 mm Falzverlust"
             : "Handgekantet · tatsächliche Deckbreite selbst eintragen";
 
+        if (ManualFoldDetailsExpander is not null)
+        {
+            ManualFoldDetailsExpander.Visibility =
+                machine ? Visibility.Collapsed : Visibility.Visible;
+
+            if (machine)
+                ManualFoldDetailsExpander.IsExpanded = false;
+        }
+
+        RecalculateCladding();
+    }
+
+    private void ApplyManualFoldDimensions_Click(object sender, RoutedEventArgs e)
+    {
+        var coil = ParseMillimeters(CoilWidthBox.Text);
+        var upperFold = ParseMillimeters(ManualUpperFoldBox.Text);
+        var lowerFold = ParseMillimeters(ManualLowerFoldBox.Text);
+
+        if (coil <= 0 ||
+            upperFold < 0 ||
+            lowerFold < 0 ||
+            upperFold + lowerFold >= coil)
+        {
+            MessageBox.Show(
+                "Bitte gültige Falzmaße eingeben. Oberfalz und Unterfalz müssen zusammen kleiner als die Coilbreite sein.",
+                "Ungültige Falzmaße",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var deckWidth = coil - upperFold - lowerFold;
+
+        DeckWidthBox.Text =
+            deckWidth.ToString("0.#", CultureInfo.InvariantCulture);
+
         RecalculateCladding();
     }
 
