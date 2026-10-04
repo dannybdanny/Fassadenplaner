@@ -336,26 +336,32 @@ public sealed class SeamCutWindow : Window
         _drawingCanvas.Width = width;
         _drawingCanvas.Height = height;
 
-        const double marginLeft = 86;
-        const double marginRight = 86;
-        const double marginTop = 150;
-        const double marginBottom = 72;
+        const double marginLeft = 42;
+        const double marginRight = 42;
+        const double marginTop = 118;
+        const double marginBottom = 34;
 
         var availableWidth = Math.Max(100, width - marginLeft - marginRight);
         var availableHeight = Math.Max(100, height - marginTop - marginBottom);
 
         var rawWidth = Math.Max(_data.RawWidthMm, 1);
         var maxHeight = Math.Max(_data.StartHeightMm, _data.EndHeightMm);
+        var contentHeightMm = Math.Max(
+            maxHeight + Math.Abs(_data.BottomDeltaMm),
+            1);
 
         var scale = Math.Min(
             availableWidth / rawWidth,
-            availableHeight /
-            Math.Max(maxHeight + Math.Abs(_data.BottomDeltaMm), 1));
+            availableHeight / contentHeightMm);
 
-        var x0 = marginLeft;
-        var x1 = x0 + rawWidth * scale;
+        var scaledWidth = rawWidth * scale;
+        var scaledHeight = contentHeightMm * scale;
 
-        var bottomBase = marginTop + availableHeight;
+        // Standardansicht möglichst groß und mittig ausnutzen.
+        var x0 = (width - scaledWidth) / 2.0;
+        var x1 = x0 + scaledWidth;
+
+        var bottomBase = marginTop + scaledHeight;
 
         // "Start" ist immer die hohe Seite der Gaubenwange.
         // Rechts: Start links. Links: Start rechts (gespiegelt).
