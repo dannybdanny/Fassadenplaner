@@ -608,7 +608,7 @@
                             </Border>
 
                             <Expander x:Name="ManualFoldDetailsExpander"
-                                      Header="Falzmaße anzeigen"
+                                      Header="Falzmaße optional"
                                       Visibility="Collapsed"
                                       IsExpanded="False"
                                       Margin="0,0,0,9"
@@ -620,7 +620,7 @@
                                         Padding="10"
                                         Margin="0,5,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="Optional: Deckbreite aus Falzmaßen berechnen"
+                                        <TextBlock Text="Nur wenn du über die Falzzugaben rechnen willst."
                                                    FontSize="10"
                                                    Foreground="#6F7E89"
                                                    TextWrapping="Wrap"/>
@@ -633,7 +633,7 @@
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Oberfalz / Überdeck"
+                                                <TextBlock Text="Oberfalz"
                                                            FontSize="9.5"
                                                            Foreground="#7D8992"/>
                                                 <Grid Margin="0,2,0,0">
@@ -643,7 +643,8 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox x:Name="ManualUpperFoldBox"
                                                              Height="32"
-                                                             Text="45"/>
+                                                             Text="45"
+                                                             TextChanged="ManualFoldValue_TextChanged"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="mm"
                                                                VerticalAlignment="Center"
@@ -654,7 +655,7 @@
                                             </StackPanel>
 
                                             <StackPanel Grid.Column="2">
-                                                <TextBlock Text="Unterfalz / Unterdeck"
+                                                <TextBlock Text="Unterfalz"
                                                            FontSize="9.5"
                                                            Foreground="#7D8992"/>
                                                 <Grid Margin="0,2,0,0">
@@ -664,7 +665,8 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox x:Name="ManualLowerFoldBox"
                                                              Height="32"
-                                                             Text="35"/>
+                                                             Text="35"
+                                                             TextChanged="ManualFoldValue_TextChanged"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="mm"
                                                                VerticalAlignment="Center"
@@ -675,7 +677,78 @@
                                             </StackPanel>
                                         </Grid>
 
-                                        <Button Content="Deckbreite aus Falzmaßen übernehmen"
+                                        <Border Background="#EEF4F7"
+                                                CornerRadius="6"
+                                                Padding="8"
+                                                Margin="0,7,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Rechnerisches Deckmaß"
+                                                           FontSize="10"
+                                                           Foreground="#687783"/>
+                                                <TextBlock x:Name="ManualCalculatedDeckText"
+                                                           Grid.Column="1"
+                                                           Text="420 mm"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#31566B"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <Grid Margin="0,7,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="32"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Praxis-Korrektur"
+                                                           FontSize="9.5"
+                                                           Foreground="#7D8992"/>
+                                                <TextBlock Text="z. B. durch Falzspiel / Materialstärke"
+                                                           FontSize="8.5"
+                                                           Foreground="#929CA4"/>
+                                            </StackPanel>
+                                            <TextBox x:Name="ManualDeckCorrectionBox"
+                                                     Grid.Column="1"
+                                                     Height="30"
+                                                     Text="0"
+                                                     TextChanged="ManualFoldValue_TextChanged"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="mm"
+                                                       VerticalAlignment="Center"
+                                                       HorizontalAlignment="Center"
+                                                       FontSize="10"
+                                                       Foreground="#6E7A86"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,7,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Tatsächliches Deckmaß"
+                                                       FontSize="10"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#53636F"/>
+                                            <TextBlock x:Name="ManualActualDeckText"
+                                                       Grid.Column="1"
+                                                       Text="420 mm"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#1E536B"/>
+                                        </Grid>
+
+                                        <TextBlock Text="Hinweis: In der Praxis kann das reale Deckmaß einige Millimeter größer sein. Am besten am eigenen Profil prüfen."
+                                                   Margin="0,5,0,0"
+                                                   FontSize="8.8"
+                                                   Foreground="#8A969F"
+                                                   TextWrapping="Wrap"/>
+
+                                        <Button Content="Dieses Deckmaß verwenden"
                                                 Height="31"
                                                 Margin="0,8,0,0"
                                                 Click="ApplyManualFoldDimensions_Click"/>
