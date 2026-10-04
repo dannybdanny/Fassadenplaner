@@ -53,12 +53,12 @@ public sealed class SeamCutWindow : Window
         _data = data;
 
         Title = $"Zuschnitt · Schar {data.PanNumber}";
-        Width = 900;
-        Height = 620;
-        MinWidth = 720;
-        MinHeight = 500;
+        Width = 640;
+        Height = 720;
+        MinWidth = 540;
+        MinHeight = 560;
         MaxHeight = Math.Max(520, SystemParameters.WorkArea.Height - 40);
-        MaxWidth = Math.Max(760, SystemParameters.WorkArea.Width - 40);
+        MaxWidth = Math.Max(660, SystemParameters.WorkArea.Width - 40);
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowState = WindowState.Normal;
         ResizeMode = ResizeMode.CanResize;
@@ -330,10 +330,10 @@ public sealed class SeamCutWindow : Window
         _drawingCanvas.Width = width;
         _drawingCanvas.Height = height;
 
-        const double marginLeft = 100;
-        const double marginRight = 110;
-        const double marginTop = 115;
-        const double marginBottom = 82;
+        const double marginLeft = 86;
+        const double marginRight = 86;
+        const double marginTop = 150;
+        const double marginBottom = 72;
 
         var availableWidth = Math.Max(100, width - marginLeft - marginRight);
         var availableHeight = Math.Max(100, height - marginTop - marginBottom);
@@ -408,33 +408,45 @@ public sealed class SeamCutWindow : Window
             new Point((x0 + x1) / 2, (leftTop + rightTop) / 2),
             _data.BottomAllowanceMm * scale);
 
-        // Maßkette oben: Falz | Deckbreite | Falz.
+        // Kompakte Profilansicht über der Schar.
+        var profileY =
+            Math.Max(38, Math.Min(leftTop, rightTop) - 88);
+
+        DrawProfileView(
+            x0,
+            startFoldX,
+            endFoldX,
+            x1,
+            profileY);
+
+        // Maßkette direkt über der Oberkante:
+        // nur Falz | Deckbreite | Falz, ohne ausgeschriebene Bezeichnungen.
         var topDimensionY =
-            Math.Max(35, Math.Min(leftTop, rightTop) - 46);
+            Math.Max(profileY + 34, Math.Min(leftTop, rightTop) - 24);
 
         DrawDimensionSegment(
             x0,
             startFoldX,
             topDimensionY,
-            $"{_data.StartFoldName} {FormatLength(_data.StartFoldMm)}");
+            FormatLength(_data.StartFoldMm));
 
         DrawDimensionSegment(
             startFoldX,
             endFoldX,
-            topDimensionY - 28,
-            $"Deckbreite {FormatLength(_data.VisibleWidthMm)}");
+            topDimensionY,
+            FormatLength(_data.VisibleWidthMm));
 
         DrawDimensionSegment(
             endFoldX,
             x1,
             topDimensionY,
-            $"{_data.EndFoldName} {FormatLength(_data.EndFoldMm)}");
+            FormatLength(_data.EndFoldMm));
 
         DrawHorizontalDimension(
             x0,
             x1,
             Math.Min(height - 28, Math.Max(leftBottom, rightBottom) + 40),
-            $"{FormatLength(_data.RawWidthMm)} Rohbreite");
+            FormatLength(_data.RawWidthMm));
 
         DrawVerticalDimension(
             x0 - 50,
@@ -449,16 +461,139 @@ public sealed class SeamCutWindow : Window
             FormatLength(_data.EndHeightMm));
 
         AddLegend(
-            $"oben: +{FormatLength(_data.TopAllowanceMm)}",
+            $"oben +{FormatLength(_data.TopAllowanceMm)}",
             (x0 + x1) / 2,
-            Math.Max(6, topDimensionY - 58),
+            Math.Max(profileY - 26, 4),
             HorizontalAlignment.Center);
 
         AddLegend(
-            $"unten: +{FormatLength(_data.BottomAllowanceMm)}",
+            $"unten +{FormatLength(_data.BottomAllowanceMm)}",
             (x0 + x1) / 2,
             Math.Min(height - 50, Math.Max(leftBottom, rightBottom) + 10),
             HorizontalAlignment.Center);
+    }
+
+    private void DrawProfileView(
+        double x0,
+        double startFoldX,
+        double endFoldX,
+        double x1,
+        double y)
+    {
+        var stroke = new SolidColorBrush(Color.FromRgb(45, 61, 72));
+        var accent = new SolidColorBrush(Color.FromRgb(72, 119, 145));
+
+        // Deckfläche des Profils.
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = startFoldX,
+            X2 = endFoldX,
+            Y1 = y,
+            Y2 = y,
+            Stroke = stroke,
+            StrokeThickness = 1.8
+        });
+
+        DrawProfileFold(
+            x0,
+            startFoldX,
+            y,
+            _data.StartFoldName,
+            isLeft: true,
+            stroke,
+            accent);
+
+        DrawProfileFold(
+            endFoldX,
+            x1,
+            y,
+            _data.EndFoldName,
+            isLeft: false,
+            stroke,
+            accent);
+
+        var caption = new TextBlock
+        {
+            Text = "Profilansicht",
+            FontSize = 9,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(124, 137, 147))
+        };
+
+        caption.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Canvas.SetLeft(caption, (x0 + x1) / 2 - caption.DesiredSize.Width / 2);
+        Canvas.SetTop(caption, y - 28);
+        _drawingCanvas.Children.Add(caption);
+    }
+
+    private void DrawProfileFold(
+        double outerX,
+        double innerX,
+        double y,
+        string foldName,
+        bool isLeft,
+        Brush stroke,
+        Brush accent)
+    {
+        var direction = isLeft ? 1.0 : -1.0;
+        var outer = isLeft ? outerX : outerX;
+        var inner = isLeft ? innerX : innerX;
+
+        // Die Profilansicht ist bewusst schematisch:
+        // Unterfalz = einfache Aufkantung mit kurzer Rückkantung,
+        // Oberfalz = höhere Aufkantung mit kleiner Überdeckung.
+        var isUpper = foldName.Contains(
+            "Ober",
+            StringComparison.OrdinalIgnoreCase);
+
+        var rise = isUpper ? 18.0 : 13.0;
+        var returnLength = isUpper ? 12.0 : 8.0;
+
+        var baseX = inner;
+
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = baseX,
+            X2 = baseX,
+            Y1 = y,
+            Y2 = y - rise,
+            Stroke = accent,
+            StrokeThickness = 1.8
+        });
+
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = baseX,
+            X2 = baseX - direction * returnLength,
+            Y1 = y - rise,
+            Y2 = y - rise,
+            Stroke = accent,
+            StrokeThickness = 1.8
+        });
+
+        if (isUpper)
+        {
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX - direction * returnLength,
+                X2 = baseX - direction * returnLength,
+                Y1 = y - rise,
+                Y2 = y - rise + 5,
+                Stroke = accent,
+                StrokeThickness = 1.8
+            });
+        }
+
+        // kurze Basislinie bis zur Rohkante, damit Coilbreite und Falzzone erkennbar bleiben.
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = outer,
+            X2 = baseX,
+            Y1 = y,
+            Y2 = y,
+            Stroke = stroke,
+            StrokeThickness = 1.2
+        });
     }
 
     private void DrawFoldBand(Point p1, Point p2, Point p3, Point p4)
@@ -563,7 +698,7 @@ public sealed class SeamCutWindow : Window
         label.Child = new TextBlock
         {
             Text = text,
-            FontSize = 9.2,
+            FontSize = 9.6,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(55, 69, 79)),
             TextAlignment = TextAlignment.Center
