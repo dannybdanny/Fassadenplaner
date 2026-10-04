@@ -175,7 +175,7 @@ public partial class MainWindow : Window
         CladdingPropertiesPanel.Visibility = Visibility.Visible;
 
         ToolPanelTitle.Text = "Bekleidung";
-        ToolPanelSubtitle.Text = "Coil, Falz, Deckbreite und Umschläge";
+        ToolPanelSubtitle.Text = "Material, Deckmaß und Umschläge";
 
         CladdingToolButton.Background =
             new SolidColorBrush(Color.FromRgb(231, 241, 247));
@@ -201,8 +201,7 @@ public partial class MainWindow : Window
     private void RecalculateCladding()
     {
         if (CoilWidthBox is null ||
-            OverlapBox is null ||
-            UnderlapBox is null ||
+            DeckWidthBox is null ||
             TopAllowanceBox is null ||
             BottomAllowanceBox is null)
         {
@@ -210,30 +209,32 @@ public partial class MainWindow : Window
         }
 
         var coil = ParseMillimeters(CoilWidthBox.Text);
-        var overlap = ParseMillimeters(OverlapBox.Text);
-        var underlap = ParseMillimeters(UnderlapBox.Text);
+        var deckWidth = ParseMillimeters(DeckWidthBox.Text);
         var top = ParseMillimeters(TopAllowanceBox.Text);
         var bottom = ParseMillimeters(BottomAllowanceBox.Text);
 
-        var deckWidth = coil - overlap - underlap;
-
-        if (coil <= 0 || overlap < 0 || underlap < 0 || deckWidth <= 0)
+        if (coil <= 0 ||
+            deckWidth <= 0 ||
+            deckWidth >= coil)
         {
-            DeckWidthText.Text = "–";
-            DeckWidthText.Foreground =
+            FoldLossText.Text = "–";
+            FoldLossText.Foreground =
                 new SolidColorBrush(Color.FromRgb(173, 66, 66));
 
             CladdingSummaryText.Text =
-                "Bitte gültige Werte eingeben. Coilbreite muss größer als Überdeck + Unterdeck sein.";
+                "Bitte gültige Werte eingeben. Die Deckbreite muss kleiner als die Coilbreite sein.";
             return;
         }
 
-        DeckWidthText.Text = $"{deckWidth:0.#} mm";
-        DeckWidthText.Foreground =
-            new SolidColorBrush(Color.FromRgb(30, 83, 107));
+        var foldLoss = coil - deckWidth;
+
+        FoldLossText.Text = $"{foldLoss:0.#} mm";
+        FoldLossText.Foreground =
+            new SolidColorBrush(Color.FromRgb(49, 86, 107));
 
         CladdingSummaryText.Text =
-            $"{coil:0.#} mm Coil → {deckWidth:0.#} mm Deckbreite · " +
+            $"{coil:0.#} mm Coil · {deckWidth:0.#} mm Deckbreite · " +
+            $"{foldLoss:0.#} mm Falzverlust · " +
             $"oben {Math.Max(top, 0):0.#} mm · unten {Math.Max(bottom, 0):0.#} mm";
     }
 
