@@ -45,6 +45,12 @@ public sealed class SeamCutWindow : Window
 
     private bool UseCentimeters => _unitCombo.SelectedIndex <= 0;
 
+    // In der 2D-Zuschnittansicht wird die linke Gaubenwange gespiegelt:
+    // hohe Startseite rechts, Deckrichtung rechts → links.
+    // Rechte Wange: hohe Startseite links, Deckrichtung links → rechts.
+    private bool IsLeftCheek =>
+        _data.SurfaceName.Contains("links", StringComparison.OrdinalIgnoreCase);
+
     private static readonly CultureInfo GermanCulture =
         CultureInfo.GetCultureInfo("de-DE");
 
@@ -350,30 +356,71 @@ public sealed class SeamCutWindow : Window
         var x1 = x0 + rawWidth * scale;
 
         var bottomBase = marginTop + availableHeight;
-        var leftBottom = bottomBase;
-        var rightBottom = bottomBase - _data.BottomDeltaMm * scale;
 
-        var leftTop = leftBottom - _data.StartHeightMm * scale;
-        var rightTop = rightBottom - _data.EndHeightMm * scale;
+        // "Start" ist immer die hohe Seite der Gaubenwange.
+        // Rechts: Start links. Links: Start rechts (gespiegelt).
+        var startBottom = bottomBase;
+        var endBottom = bottomBase - _data.BottomDeltaMm * scale;
+
+        var startTop = startBottom - _data.StartHeightMm * scale;
+        var endTop = endBottom - _data.EndHeightMm * scale;
+
+        var leftBottom = IsLeftCheek ? endBottom : startBottom;
+        var rightBottom = IsLeftCheek ? startBottom : endBottom;
+
+        var leftTop = IsLeftCheek ? endTop : startTop;
+        var rightTop = IsLeftCheek ? startTop : endTop;
 
         var pBottomLeft = new Point(x0, leftBottom);
         var pBottomRight = new Point(x1, rightBottom);
         var pTopRight = new Point(x1, rightTop);
         var pTopLeft = new Point(x0, leftTop);
 
-        var startFoldX = x0 + _data.StartFoldMm * scale;
-        var endFoldX = x1 - _data.EndFoldMm * scale;
+        var startFoldX = IsLeftCheek
+            ? x1 - _data.StartFoldMm * scale
+            : x0 + _data.StartFoldMm * scale;
+
+        var endFoldX = IsLeftCheek
+            ? x0 + _data.EndFoldMm * scale
+            : x1 - _data.EndFoldMm * scale;
+
+        var leftFoldX = IsLeftCheek ? endFoldX : startFoldX;
+        var rightFoldX = IsLeftCheek ? startFoldX : endFoldX;
+
+        var leftFoldName = IsLeftCheek
+            ? _data.EndFoldName
+            : _data.StartFoldName;
+
+        var rightFoldName = IsLeftCheek
+            ? _data.StartFoldName
+            : _data.EndFoldName;
+
+        var leftFoldMm = IsLeftCheek
+            ? _data.EndFoldMm
+            : _data.StartFoldMm;
+
+        var rightFoldMm = IsLeftCheek
+            ? _data.StartFoldMm
+            : _data.EndFoldMm;
+
+        var leftHeightMm = IsLeftCheek
+            ? _data.EndHeightMm
+            : _data.StartHeightMm;
+
+        var rightHeightMm = IsLeftCheek
+            ? _data.StartHeightMm
+            : _data.EndHeightMm;
 
         // Falzzonen zuerst, damit ihre Bedeutung optisch klar ist.
         DrawFoldBand(
             new Point(x0, leftBottom),
             new Point(x0, leftTop),
-            new Point(startFoldX, leftTop),
-            new Point(startFoldX, leftBottom));
+            new Point(leftFoldX, leftTop),
+            new Point(leftFoldX, leftBottom));
 
         DrawFoldBand(
-            new Point(endFoldX, rightBottom),
-            new Point(endFoldX, rightTop),
+            new Point(rightFoldX, rightBottom),
+            new Point(rightFoldX, rightTop),
             new Point(x1, rightTop),
             new Point(x1, rightBottom));
 
@@ -393,8 +440,8 @@ public sealed class SeamCutWindow : Window
 
         _drawingCanvas.Children.Add(polygon);
 
-        DrawFoldLine(startFoldX, leftBottom, leftTop);
-        DrawFoldLine(endFoldX, rightBottom, rightTop);
+        DrawFoldLine(leftFoldX, leftBottom, leftTop);
+        DrawFoldLine(rightFoldX, rightBottom, rightTop);
 
         DrawAllowanceLine(
             pTopLeft,
@@ -414,10 +461,12 @@ public sealed class SeamCutWindow : Window
 
         DrawProfileView(
             x0,
-            startFoldX,
-            endFoldX,
+            leftFoldX,
+            rightFoldX,
             x1,
-            profileY);
+            profileY,
+            leftFoldName,
+            rightFoldName);
 
         // Maßkette direkt über der Oberkante:
         // nur Falz | Deckbreite | Falz, ohne ausgeschriebene Bezeichnungen.
@@ -426,21 +475,21 @@ public sealed class SeamCutWindow : Window
 
         DrawDimensionSegment(
             x0,
-            startFoldX,
+            leftFoldX,
             topDimensionY,
-            FormatLength(_data.StartFoldMm));
+            FormatLength(leftFoldMm));
 
         DrawDimensionSegment(
-            startFoldX,
-            endFoldX,
+            leftFoldX,
+            rightFoldX,
             topDimensionY,
             FormatLength(_data.VisibleWidthMm));
 
         DrawDimensionSegment(
-            endFoldX,
+            rightFoldX,
             x1,
             topDimensionY,
-            FormatLength(_data.EndFoldMm));
+            FormatLength(rightFoldMm));
 
         DrawHorizontalDimension(
             x0,
@@ -452,18 +501,24 @@ public sealed class SeamCutWindow : Window
             x0 - 50,
             leftBottom,
             leftTop,
-            FormatLength(_data.StartHeightMm));
+            FormatLength(leftHeightMm));
 
         DrawVerticalDimension(
             x1 + 50,
             rightBottom,
             rightTop,
-            FormatLength(_data.EndHeightMm));
+            FormatLength(rightHeightMm));
 
         AddLegend(
             $"oben +{FormatLength(_data.TopAllowanceMm)}",
             (x0 + x1) / 2,
             Math.Max(profileY - 26, 4),
+            HorizontalAlignment.Center);
+
+        AddLegend(
+            $"Deckrichtung {_data.DeckDirection}",
+            (x0 + x1) / 2,
+            Math.Max(profileY + 12, 20),
             HorizontalAlignment.Center);
 
         AddLegend(
@@ -475,10 +530,12 @@ public sealed class SeamCutWindow : Window
 
     private void DrawProfileView(
         double x0,
-        double startFoldX,
-        double endFoldX,
+        double leftFoldX,
+        double rightFoldX,
         double x1,
-        double y)
+        double y,
+        string leftFoldName,
+        string rightFoldName)
     {
         var stroke = new SolidColorBrush(Color.FromRgb(45, 61, 72));
         var accent = new SolidColorBrush(Color.FromRgb(72, 119, 145));
@@ -486,8 +543,8 @@ public sealed class SeamCutWindow : Window
         // Deckfläche des Profils.
         _drawingCanvas.Children.Add(new Line
         {
-            X1 = startFoldX,
-            X2 = endFoldX,
+            X1 = leftFoldX,
+            X2 = rightFoldX,
             Y1 = y,
             Y2 = y,
             Stroke = stroke,
@@ -496,18 +553,18 @@ public sealed class SeamCutWindow : Window
 
         DrawProfileFold(
             x0,
-            startFoldX,
+            leftFoldX,
             y,
-            _data.StartFoldName,
+            leftFoldName,
             isLeft: true,
             stroke,
             accent);
 
         DrawProfileFold(
-            endFoldX,
+            rightFoldX,
             x1,
             y,
-            _data.EndFoldName,
+            rightFoldName,
             isLeft: false,
             stroke,
             accent);
