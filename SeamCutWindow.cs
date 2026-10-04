@@ -518,47 +518,199 @@ public sealed class SeamCutWindow : Window
         Point left,
         Point right)
     {
-        var dxPx = right.X - left.X;
-        var dyPx = right.Y - left.Y;
+        var dx = right.X - left.X;
+        var dy = right.Y - left.Y;
 
-        if (Math.Abs(dxPx) < 0.001)
+        if (Math.Abs(dx) < 0.001)
             return;
 
-        // Der Winkel wird gegen die Waagerechte angegeben.
-        // Pixel-Skalierung ist in X/Y identisch, daher entspricht die
-        // Bildschirmgeometrie dem realen Winkel der Zuschnittkante.
-        var angleDeg =
-            Math.Atan2(Math.Abs(dyPx), Math.Abs(dxPx)) *
+        var roofAngleDeg =
+            Math.Atan2(Math.Abs(dy), Math.Abs(dx)) *
             180.0 / Math.PI;
 
-        var mid = new Point(
-            (left.X + right.X) / 2.0,
-            (left.Y + right.Y) / 2.0);
+        var interiorAngleDeg =
+            Math.Max(0, 90.0 - roofAngleDeg);
 
+        // Tiefster Punkt der schrägen Unterkante:
+        // dort treffen Längsseite und Schrägschnitt zusammen.
+        var low = left.Y >= right.Y ? left : right;
+        var other = left.Y >= right.Y ? right : left;
+
+        var horizontalDirection =
+            other.X >= low.X ? 1.0 : -1.0;
+
+        var stroke =
+            new SolidColorBrush(Color.FromRgb(49, 86, 107));
+
+        // Waagerechte Referenz für die Dachneigung.
+        var referenceLength = 72.0;
+        var referenceEnd = new Point(
+            low.X + horizontalDirection * referenceLength,
+            low.Y);
+
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = low.X,
+            X2 = referenceEnd.X,
+            Y1 = low.Y,
+            Y2 = referenceEnd.Y,
+            Stroke = stroke,
+            StrokeThickness = 1.2
+        });
+
+        // Dachneigungswinkel zwischen Horizontaler und Schnittkante.
+        DrawAngleArc(
+            low,
+            referenceLength * 0.42,
+            0,
+            roofAngleDeg,
+            horizontalDirection > 0,
+            stroke);
+
+        AddAngleLabel(
+            $"DN {roofAngleDeg.ToString("0.#", GermanCulture)}°",
+            new Point(
+                low.X + horizontalDirection * 48,
+                low.Y - 18));
+
+        // Innenwinkel zwischen Längsseite (senkrecht) und Schrägschnitt.
+        DrawInteriorAngleArc(
+            low,
+            30,
+            roofAngleDeg,
+            horizontalDirection > 0,
+            stroke);
+
+        AddAngleLabel(
+            $"Innen {interiorAngleDeg.ToString("0.#", GermanCulture)}°",
+            new Point(
+                low.X + horizontalDirection * 30,
+                low.Y - 48));
+    }
+
+    private void DrawAngleArc(
+        Point center,
+        double radius,
+        double startDeg,
+        double endDeg,
+        bool toRight,
+        Brush stroke)
+    {
+        var startAngle = toRight ? 0.0 : 180.0;
+        var endAngle = toRight
+            ? -endDeg
+            : 180.0 + endDeg;
+
+        var start = PointOnCircle(center, radius, startAngle);
+        var end = PointOnCircle(center, radius, endAngle);
+
+        var figure = new PathFigure
+        {
+            StartPoint = start,
+            IsClosed = false
+        };
+
+        figure.Segments.Add(new ArcSegment
+        {
+            Point = end,
+            Size = new Size(radius, radius),
+            SweepDirection = toRight
+                ? SweepDirection.Counterclockwise
+                : SweepDirection.Clockwise,
+            IsLargeArc = false
+        });
+
+        _drawingCanvas.Children.Add(new Path
+        {
+            Data = new PathGeometry(new[] { figure }),
+            Stroke = stroke,
+            StrokeThickness = 1.15
+        });
+    }
+
+    private void DrawInteriorAngleArc(
+        Point center,
+        double radius,
+        double roofAngleDeg,
+        bool toRight,
+        Brush stroke)
+    {
+        // vom senkrechten Längsanschlag zur Schrägkante
+        var verticalAngle = -90.0;
+        var slopeAngle = toRight
+            ? -roofAngleDeg
+            : 180.0 + roofAngleDeg;
+
+        var start = PointOnCircle(center, radius, verticalAngle);
+        var end = PointOnCircle(center, radius, slopeAngle);
+
+        var figure = new PathFigure
+        {
+            StartPoint = start,
+            IsClosed = false
+        };
+
+        figure.Segments.Add(new ArcSegment
+        {
+            Point = end,
+            Size = new Size(radius, radius),
+            SweepDirection = toRight
+                ? SweepDirection.Clockwise
+                : SweepDirection.Counterclockwise,
+            IsLargeArc = false
+        });
+
+        _drawingCanvas.Children.Add(new Path
+        {
+            Data = new PathGeometry(new[] { figure }),
+            Stroke = stroke,
+            StrokeThickness = 1.15
+        });
+    }
+
+    private static Point PointOnCircle(
+        Point center,
+        double radius,
+        double angleDeg)
+    {
+        var angle = angleDeg * Math.PI / 180.0;
+
+        return new Point(
+            center.X + Math.Cos(angle) * radius,
+            center.Y + Math.Sin(angle) * radius);
+    }
+
+    private void AddAngleLabel(
+        string text,
+        Point center)
+    {
         var label = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)),
-            Padding = new Thickness(4, 1, 4, 1),
+            Background =
+                new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)),
+            Padding = new Thickness(3, 1, 3, 1),
             Child = new TextBlock
             {
-                Text = $"{angleDeg.ToString("0.#", GermanCulture)}°",
-                FontSize = 9.5,
+                Text = text,
+                FontSize = 8.8,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(49, 86, 107))
+                Foreground =
+                    new SolidColorBrush(Color.FromRgb(49, 86, 107))
             }
         };
 
-        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        label.Measure(
+            new Size(
+                double.PositiveInfinity,
+                double.PositiveInfinity));
 
-        // Etwas oberhalb der schrägen Unterkante, damit die Beschriftung
-        // die Linie nicht überdeckt.
         Canvas.SetLeft(
             label,
-            mid.X - label.DesiredSize.Width / 2.0);
+            center.X - label.DesiredSize.Width / 2);
 
         Canvas.SetTop(
             label,
-            mid.Y - label.DesiredSize.Height - 7);
+            center.Y - label.DesiredSize.Height / 2);
 
         _drawingCanvas.Children.Add(label);
     }
@@ -688,9 +840,11 @@ public sealed class SeamCutWindow : Window
         }
         else
         {
-            // Unterfalz: bewusst einfacher und kleiner.
+            // Unterfalz: Aufkantung mit ca. 1-cm-Rückkantung NACH INNEN
+            // zur Deckfläche hin.
             var rise = 22.0;
-            var head = 11.0;
+            var returnLength = 11.0;
+            var inward = -outward;
 
             _drawingCanvas.Children.Add(new Line
             {
@@ -705,7 +859,7 @@ public sealed class SeamCutWindow : Window
             _drawingCanvas.Children.Add(new Line
             {
                 X1 = baseX,
-                X2 = baseX + outward * head,
+                X2 = baseX + inward * returnLength,
                 Y1 = baseY - rise,
                 Y2 = baseY - rise,
                 Stroke = stroke,
