@@ -456,7 +456,7 @@ public sealed class SeamCutWindow : Window
             _data.BottomAllowanceMm * scale);
 
         // Profilansicht ganz oben im Zeichenbereich.
-        var profileY = 42.0;
+        var profileY = 58.0;
 
         DrawProfileView(
             x0,
@@ -575,7 +575,7 @@ public sealed class SeamCutWindow : Window
         // Diese Ansicht ist absichtlich NICHT maßstäblich.
         // Sie soll nur auf einen Blick zeigen, wo Oberfalz und Unterfalz liegen.
         var center = (x0 + x1) / 2.0;
-        var profileWidth = Math.Min(190.0, Math.Max(150.0, (x1 - x0) * 0.9));
+        var profileWidth = 150.0;
 
         var leftBase = center - profileWidth / 2.0;
         var rightBase = center + profileWidth / 2.0;
@@ -638,60 +638,83 @@ public sealed class SeamCutWindow : Window
 
         var outward = isLeftSide ? -1.0 : 1.0;
 
-        // bewusst überzeichnet, damit die Profilart klar lesbar ist
-        var rise = isUpper ? 30.0 : 23.0;
-        var head = isUpper ? 21.0 : 13.0;
-        var drop = isUpper ? 10.0 : 6.0;
-
-        // senkrechte Aufkantung
-        _drawingCanvas.Children.Add(new Line
-        {
-            X1 = baseX,
-            X2 = baseX,
-            Y1 = baseY,
-            Y2 = baseY - rise,
-            Stroke = stroke,
-            StrokeThickness = 2.4
-        });
-
-        // Kopfkantung
-        _drawingCanvas.Children.Add(new Line
-        {
-            X1 = baseX,
-            X2 = baseX + outward * head,
-            Y1 = baseY - rise,
-            Y2 = baseY - rise,
-            Stroke = stroke,
-            StrokeThickness = 2.4
-        });
-
-        // Rückkantung
-        _drawingCanvas.Children.Add(new Line
-        {
-            X1 = baseX + outward * head,
-            X2 = baseX + outward * head,
-            Y1 = baseY - rise,
-            Y2 = baseY - rise + drop,
-            Stroke = stroke,
-            StrokeThickness = 2.4
-        });
-
         if (isUpper)
         {
-            // Oberfalz bekommt zusätzlich eine klar erkennbare Überdeckung.
+            // Oberfalz: höher und mit klar erkennbarer Überdeckung.
+            var rise = 30.0;
+            var head = 20.0;
+            var drop = 10.0;
+            var overlap = 9.0;
+
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX,
+                X2 = baseX,
+                Y1 = baseY,
+                Y2 = baseY - rise,
+                Stroke = stroke,
+                StrokeThickness = 2.4
+            });
+
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX,
+                X2 = baseX + outward * head,
+                Y1 = baseY - rise,
+                Y2 = baseY - rise,
+                Stroke = stroke,
+                StrokeThickness = 2.4
+            });
+
             _drawingCanvas.Children.Add(new Line
             {
                 X1 = baseX + outward * head,
-                X2 = baseX + outward * (head - 8),
+                X2 = baseX + outward * head,
+                Y1 = baseY - rise,
+                Y2 = baseY - rise + drop,
+                Stroke = stroke,
+                StrokeThickness = 2.4
+            });
+
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX + outward * head,
+                X2 = baseX + outward * (head - overlap),
                 Y1 = baseY - rise + drop,
                 Y2 = baseY - rise + drop,
                 Stroke = stroke,
                 StrokeThickness = 2.4
             });
         }
+        else
+        {
+            // Unterfalz: bewusst einfacher und kleiner.
+            var rise = 22.0;
+            var head = 11.0;
 
-        // kleine Kennzeichnung direkt am Profil, damit man die Seite sofort erkennt
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX,
+                X2 = baseX,
+                Y1 = baseY,
+                Y2 = baseY - rise,
+                Stroke = stroke,
+                StrokeThickness = 2.4
+            });
+
+            _drawingCanvas.Children.Add(new Line
+            {
+                X1 = baseX,
+                X2 = baseX + outward * head,
+                Y1 = baseY - rise,
+                Y2 = baseY - rise,
+                Stroke = stroke,
+                StrokeThickness = 2.4
+            });
+        }
+
         var shortLabel = isUpper ? "O" : "U";
+
         var label = new Border
         {
             Background = Brushes.White,
@@ -707,9 +730,16 @@ public sealed class SeamCutWindow : Window
 
         label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
-        var labelX = baseX + outward * (head + 10);
-        Canvas.SetLeft(label, labelX - label.DesiredSize.Width / 2);
-        Canvas.SetTop(label, baseY - rise - 4);
+        var labelX = baseX + outward * 18;
+
+        Canvas.SetLeft(
+            label,
+            labelX - label.DesiredSize.Width / 2);
+
+        Canvas.SetTop(
+            label,
+            baseY - 30);
+
         _drawingCanvas.Children.Add(label);
     }
 
