@@ -1127,14 +1127,17 @@
                                     CornerRadius="8"
                                     Padding="10">
                                 <StackPanel>
-                                    <TextBlock Text="Zuschnitt · Schar 1"
+                                    <TextBlock x:Name="SelectedPanCutTitle"
+                                               Text="Zuschnitt · Schar 1"
                                                FontSize="11"
                                                FontWeight="SemiBold"
                                                Foreground="#31566B"/>
-                                    <TextBlock Text="Startschar mit Unterfalz auf beiden Seiten"
+                                    <TextBlock x:Name="SelectedPanCutSubtitle"
+                                               Text="Einfach anklicken · Doppelklick öffnet den 2D-Zuschnitt"
                                                Margin="0,2,0,0"
                                                FontSize="9.5"
-                                               Foreground="#70808B"/>
+                                               Foreground="#70808B"
+                                               TextWrapping="Wrap"/>
 
                                     <Grid Margin="0,7,0,0">
                                         <Grid.ColumnDefinitions>
@@ -1157,7 +1160,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Rohhöhe außen"
+                                        <TextBlock Text="Rohhöhe Startseite"
                                                    FontSize="10"
                                                    Foreground="#7D8992"/>
                                         <TextBlock x:Name="StartPanOuterHeightText"
@@ -1173,7 +1176,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Rohhöhe innen"
+                                        <TextBlock Text="Rohhöhe Endseite"
                                                    FontSize="10"
                                                    Foreground="#7D8992"/>
                                         <TextBlock x:Name="StartPanInnerHeightText"
