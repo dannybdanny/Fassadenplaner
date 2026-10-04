@@ -572,15 +572,15 @@ public sealed class SeamCutWindow : Window
 
         if (_data.ShowTopAngle)
         {
-            if (pTopApex is Point topApex)
+            if (pTopApex is Point angleApex)
             {
-                var leftLength = (topApex - pTopLeft).Length;
-                var rightLength = (pTopRight - topApex).Length;
+                var leftLength = (angleApex - pTopLeft).Length;
+                var rightLength = (pTopRight - angleApex).Length;
 
                 if (leftLength >= rightLength)
-                    DrawTopAngle(pTopLeft, topApex);
+                    DrawTopAngle(pTopLeft, angleApex);
                 else
-                    DrawTopAngle(topApex, pTopRight);
+                    DrawTopAngle(angleApex, pTopRight);
             }
             else
             {
