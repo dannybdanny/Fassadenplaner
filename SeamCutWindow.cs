@@ -28,6 +28,13 @@ public sealed class SeamCutWindow : Window
 {
     private readonly SeamCutData _data;
     private readonly Canvas _canvas = new();
+    private readonly ComboBox _unitCombo = new();
+
+    private TextBlock? _coilValueText;
+    private TextBlock? _visibleValueText;
+
+    private bool UseCentimeters =>
+        _unitCombo.SelectedIndex <= 0;
 
     private static readonly CultureInfo GermanCulture =
         CultureInfo.GetCultureInfo("de-DE");
@@ -37,11 +44,15 @@ public sealed class SeamCutWindow : Window
         _data = data;
 
         Title = $"Zuschnitt · Schar {data.PanNumber}";
-        Width = 980;
-        Height = 720;
-        MinWidth = 760;
-        MinHeight = 560;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 900;
+        Height = 620;
+        MinWidth = 720;
+        MinHeight = 500;
+        MaxHeight = Math.Max(520, SystemParameters.WorkArea.Height - 40);
+        MaxWidth = Math.Max(760, SystemParameters.WorkArea.Width - 40);
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowState = WindowState.Normal;
+        ResizeMode = ResizeMode.CanResize;
         Background = new SolidColorBrush(Color.FromRgb(238, 242, 245));
 
         var root = new Grid();
@@ -54,12 +65,12 @@ public sealed class SeamCutWindow : Window
 
         var viewerBorder = new Border
         {
-            Margin = new Thickness(18, 0, 18, 18),
+            Margin = new Thickness(14, 0, 14, 14),
             Background = Brushes.White,
             BorderBrush = new SolidColorBrush(Color.FromRgb(215, 222, 229)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(14)
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(10)
         };
 
         _canvas.Background = Brushes.Transparent;
@@ -70,13 +81,19 @@ public sealed class SeamCutWindow : Window
         root.Children.Add(viewerBorder);
 
         Content = root;
+
+        Loaded += (_, _) =>
+        {
+            UpdateHeaderValues();
+            DrawCut();
+        };
     }
 
     private UIElement BuildHeader()
     {
         var grid = new Grid
         {
-            Margin = new Thickness(18, 16, 18, 12)
+            Margin = new Thickness(14, 10, 14, 10)
         };
 
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -87,7 +104,7 @@ public sealed class SeamCutWindow : Window
         left.Children.Add(new TextBlock
         {
             Text = $"{_data.SurfaceName} · Schar {_data.PanNumber}",
-            FontSize = 22,
+            FontSize = 18,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(29, 43, 54))
         });
@@ -96,18 +113,10 @@ public sealed class SeamCutWindow : Window
         {
             Text = _data.IsStartPan
                 ? "Startschar · Unterfalz auf beiden Seiten"
-                : $"{_data.StartFoldName} an der Startseite · {_data.EndFoldName} an der Endseite",
-            Margin = new Thickness(0, 3, 0, 0),
-            FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromRgb(112, 128, 139))
-        });
-
-        left.Children.Add(new TextBlock
-        {
-            Text = $"Deckrichtung: {_data.DeckDirection}",
+                : $"{_data.StartFoldName} Startseite · {_data.EndFoldName} Endseite",
             Margin = new Thickness(0, 2, 0, 0),
-            FontSize = 10.5,
-            Foreground = new SolidColorBrush(Color.FromRgb(126, 140, 150))
+            FontSize = 10,
+            Foreground = new SolidColorBrush(Color.FromRgb(112, 128, 139))
         });
 
         grid.Children.Add(left);
@@ -118,8 +127,37 @@ public sealed class SeamCutWindow : Window
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        right.Children.Add(BuildInfoChip("Coil", _data.RawWidthMm));
-        right.Children.Add(BuildInfoChip("sichtbar", _data.VisibleWidthMm));
+        _coilValueText = new TextBlock();
+        _visibleValueText = new TextBlock();
+
+        right.Children.Add(BuildInfoChip("Coil", _coilValueText));
+        right.Children.Add(BuildInfoChip("sichtbar", _visibleValueText));
+
+        _unitCombo.Width = 72;
+        _unitCombo.Height = 30;
+        _unitCombo.Margin = new Thickness(8, 0, 0, 0);
+        _unitCombo.Items.Add("cm");
+        _unitCombo.Items.Add("mm");
+        _unitCombo.SelectedIndex = 0;
+        _unitCombo.SelectionChanged += (_, _) =>
+        {
+            UpdateHeaderValues();
+            DrawCut();
+        };
+        right.Children.Add(_unitCombo);
+
+        var closeButton = new Button
+        {
+            Content = "Schließen",
+            Height = 30,
+            Margin = new Thickness(8, 0, 0, 0),
+            Padding = new Thickness(10, 0, 10, 0),
+            Background = new SolidColorBrush(Color.FromRgb(36, 55, 70)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0)
+        };
+        closeButton.Click += (_, _) => Close();
+        right.Children.Add(closeButton);
 
         Grid.SetColumn(right, 1);
         grid.Children.Add(right);
@@ -127,35 +165,51 @@ public sealed class SeamCutWindow : Window
         return grid;
     }
 
-    private static Border BuildInfoChip(string caption, double value)
+    private static Border BuildInfoChip(string caption, TextBlock valueText)
     {
         var stack = new StackPanel();
 
         stack.Children.Add(new TextBlock
         {
             Text = caption,
-            FontSize = 9,
+            FontSize = 8.5,
             Foreground = new SolidColorBrush(Color.FromRgb(127, 141, 151))
         });
 
-        stack.Children.Add(new TextBlock
-        {
-            Text = $"{value:0.#} mm",
-            FontSize = 13,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(49, 86, 107))
-        });
+        valueText.FontSize = 11.5;
+        valueText.FontWeight = FontWeights.SemiBold;
+        valueText.Foreground = new SolidColorBrush(Color.FromRgb(49, 86, 107));
+        stack.Children.Add(valueText);
 
         return new Border
         {
-            Margin = new Thickness(8, 0, 0, 0),
-            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(7, 0, 0, 0),
+            Padding = new Thickness(8, 5, 8, 5),
             Background = new SolidColorBrush(Color.FromRgb(247, 249, 251)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(218, 225, 231)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(7),
+            CornerRadius = new CornerRadius(6),
             Child = stack
         };
+    }
+
+    private void UpdateHeaderValues()
+    {
+        if (_coilValueText is not null)
+            _coilValueText.Text = FormatLength(_data.RawWidthMm);
+
+        if (_visibleValueText is not null)
+            _visibleValueText.Text = FormatLength(_data.VisibleWidthMm);
+    }
+
+    private string FormatLength(double valueMm)
+    {
+        if (UseCentimeters)
+        {
+            return $"{(valueMm / 10.0).ToString("0.#", GermanCulture)} cm";
+        }
+
+        return $"{valueMm.ToString("0.#", GermanCulture)} mm";
     }
 
     private void DrawCut()
@@ -168,38 +222,48 @@ public sealed class SeamCutWindow : Window
         if (width < 100 || height < 100)
             return;
 
-        const double marginLeft = 100;
-        const double marginRight = 120;
-        const double marginTop = 75;
-        const double marginBottom = 90;
+        const double marginLeft = 95;
+        const double marginRight = 105;
+        const double marginTop = 58;
+        const double marginBottom = 70;
 
         var availableWidth = Math.Max(100, width - marginLeft - marginRight);
         var availableHeight = Math.Max(100, height - marginTop - marginBottom);
 
         var rawWidth = Math.Max(_data.RawWidthMm, 1);
         var maxHeight = Math.Max(_data.StartHeightMm, _data.EndHeightMm);
+
         var scale = Math.Min(
             availableWidth / rawWidth,
-            availableHeight / Math.Max(maxHeight + Math.Abs(_data.BottomDeltaMm), 1));
+            availableHeight /
+            Math.Max(maxHeight + Math.Abs(_data.BottomDeltaMm), 1));
 
         var x0 = marginLeft;
         var x1 = x0 + rawWidth * scale;
 
         var bottomBase = marginTop + availableHeight;
         var leftBottom = bottomBase;
-        var rightBottom = bottomBase - _data.BottomDeltaMm * scale;
+        var rightBottom =
+            bottomBase - _data.BottomDeltaMm * scale;
 
-        var leftTop = leftBottom - _data.StartHeightMm * scale;
-        var rightTop = rightBottom - _data.EndHeightMm * scale;
+        var leftTop =
+            leftBottom - _data.StartHeightMm * scale;
+        var rightTop =
+            rightBottom - _data.EndHeightMm * scale;
+
+        var pBottomLeft = new Point(x0, leftBottom);
+        var pBottomRight = new Point(x1, rightBottom);
+        var pTopRight = new Point(x1, rightTop);
+        var pTopLeft = new Point(x0, leftTop);
 
         var polygon = new Polygon
         {
             Points = new PointCollection
             {
-                new Point(x0, leftBottom),
-                new Point(x1, rightBottom),
-                new Point(x1, rightTop),
-                new Point(x0, leftTop)
+                pBottomLeft,
+                pBottomRight,
+                pTopRight,
+                pTopLeft
             },
             Fill = new SolidColorBrush(Color.FromRgb(231, 236, 240)),
             Stroke = new SolidColorBrush(Color.FromRgb(45, 61, 72)),
@@ -208,66 +272,79 @@ public sealed class SeamCutWindow : Window
 
         _canvas.Children.Add(polygon);
 
-        DrawFoldLine(x0 + _data.StartFoldMm * scale, leftBottom, leftTop, "Falz");
-        DrawFoldLine(x1 - _data.EndFoldMm * scale, rightBottom, rightTop, "Falz");
+        // Seitenfalze.
+        DrawFoldLine(
+            x0 + _data.StartFoldMm * scale,
+            leftBottom,
+            leftTop);
+
+        DrawFoldLine(
+            x1 - _data.EndFoldMm * scale,
+            rightBottom,
+            rightTop);
+
+        // Obere und untere Umschlaglinien werden als echte, parallele
+        // gestrichelte Linien innerhalb des Zuschnitts dargestellt.
+        DrawAllowanceLine(
+            pTopLeft,
+            pTopRight,
+            new Point((x0 + x1) / 2, (leftBottom + rightBottom) / 2),
+            _data.TopAllowanceMm * scale);
+
+        DrawAllowanceLine(
+            pBottomLeft,
+            pBottomRight,
+            new Point((x0 + x1) / 2, (leftTop + rightTop) / 2),
+            _data.BottomAllowanceMm * scale);
 
         DrawHorizontalDimension(
             x0,
             x1,
-            Math.Min(height - 35, Math.Max(leftBottom, rightBottom) + 38),
-            $"{_data.RawWidthMm:0.#} mm Rohbreite");
+            Math.Min(height - 24, Math.Max(leftBottom, rightBottom) + 34),
+            $"{FormatLength(_data.RawWidthMm)} Rohbreite");
 
         DrawVerticalDimension(
-            x0 - 42,
+            x0 - 46,
             leftBottom,
             leftTop,
-            $"{_data.StartHeightMm:0.#} mm");
+            FormatLength(_data.StartHeightMm));
 
         DrawVerticalDimension(
-            x1 + 42,
+            x1 + 46,
             rightBottom,
             rightTop,
-            $"{_data.EndHeightMm:0.#} mm");
+            FormatLength(_data.EndHeightMm));
 
-        AddLabel(
-            $"{_data.StartFoldName} {_data.StartFoldMm:0.#} mm",
-            x0 + _data.StartFoldMm * scale * 0.5,
-            Math.Min(leftBottom, leftTop) - 26,
-            HorizontalAlignment.Center);
+        // Kleine Legende außerhalb der Maßlinien statt Texte über die Zeichnung.
+        AddLegend(
+            $"{_data.StartFoldName}: {FormatLength(_data.StartFoldMm)}",
+            x0,
+            14,
+            HorizontalAlignment.Left);
 
-        AddLabel(
-            $"{_data.EndFoldName} {_data.EndFoldMm:0.#} mm",
-            x1 - _data.EndFoldMm * scale * 0.5,
-            Math.Min(rightBottom, rightTop) - 26,
-            HorizontalAlignment.Center);
-
-        AddLabel(
-            $"oben +{_data.TopAllowanceMm:0.#} mm",
+        AddLegend(
+            $"oben: +{FormatLength(_data.TopAllowanceMm)}",
             (x0 + x1) / 2,
-            Math.Min(leftTop, rightTop) - 32,
+            14,
             HorizontalAlignment.Center);
 
-        AddLabel(
-            $"unten +{_data.BottomAllowanceMm:0.#} mm",
+        AddLegend(
+            $"{_data.EndFoldName}: {FormatLength(_data.EndFoldMm)}",
+            x1,
+            14,
+            HorizontalAlignment.Right);
+
+        AddLegend(
+            $"unten: +{FormatLength(_data.BottomAllowanceMm)}",
             (x0 + x1) / 2,
-            Math.Max(leftBottom, rightBottom) + 8,
+            Math.Min(height - 48, Math.Max(leftBottom, rightBottom) + 8),
             HorizontalAlignment.Center);
-
-        var note = new TextBlock
-        {
-            Text = "2D-Zuschnitt aus der geneigten Gaubenwange. Seitenfalze und Umschläge sind geometrisch berücksichtigt.",
-            FontSize = 10,
-            Foreground = new SolidColorBrush(Color.FromRgb(121, 134, 144)),
-            TextWrapping = TextWrapping.Wrap,
-            Width = Math.Max(280, width - 80)
-        };
-
-        Canvas.SetLeft(note, 40);
-        Canvas.SetTop(note, 18);
-        _canvas.Children.Add(note);
     }
 
-    private void DrawFoldLine(double x, double bottom, double top, string label)
+    private void DrawFoldLine(
+        double x,
+        double bottom,
+        double top)
     {
         _canvas.Children.Add(new Line
         {
@@ -281,13 +358,86 @@ public sealed class SeamCutWindow : Window
         });
     }
 
-    private void DrawHorizontalDimension(double x0, double x1, double y, string text)
+    private void DrawAllowanceLine(
+        Point a,
+        Point b,
+        Point interiorPoint,
+        double distance)
+    {
+        if (distance <= 0.01)
+            return;
+
+        var dx = b.X - a.X;
+        var dy = b.Y - a.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+
+        if (length < 0.001)
+            return;
+
+        var nx = -dy / length;
+        var ny = dx / length;
+
+        var mid = new Point(
+            (a.X + b.X) / 2,
+            (a.Y + b.Y) / 2);
+
+        var toInterior = new Vector(
+            interiorPoint.X - mid.X,
+            interiorPoint.Y - mid.Y);
+
+        if (nx * toInterior.X + ny * toInterior.Y < 0)
+        {
+            nx = -nx;
+            ny = -ny;
+        }
+
+        var oa = new Point(
+            a.X + nx * distance,
+            a.Y + ny * distance);
+
+        var ob = new Point(
+            b.X + nx * distance,
+            b.Y + ny * distance);
+
+        _canvas.Children.Add(new Line
+        {
+            X1 = oa.X,
+            X2 = ob.X,
+            Y1 = oa.Y,
+            Y2 = ob.Y,
+            Stroke = new SolidColorBrush(Color.FromRgb(72, 119, 145)),
+            StrokeThickness = 1.1,
+            StrokeDashArray = new DoubleCollection { 5, 3 }
+        });
+    }
+
+    private void DrawHorizontalDimension(
+        double x0,
+        double x1,
+        double y,
+        string text)
     {
         var stroke = new SolidColorBrush(Color.FromRgb(92, 105, 115));
+
+        var label = CreateLabel(text);
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var center = (x0 + x1) / 2;
+        var gap = label.DesiredSize.Width / 2 + 7;
 
         _canvas.Children.Add(new Line
         {
             X1 = x0,
+            X2 = Math.Max(x0, center - gap),
+            Y1 = y,
+            Y2 = y,
+            Stroke = stroke,
+            StrokeThickness = 1
+        });
+
+        _canvas.Children.Add(new Line
+        {
+            X1 = Math.Min(x1, center + gap),
             X2 = x1,
             Y1 = y,
             Y2 = y,
@@ -298,19 +448,41 @@ public sealed class SeamCutWindow : Window
         DrawTick(x0, y, true, stroke);
         DrawTick(x1, y, true, stroke);
 
-        AddLabel(text, (x0 + x1) / 2, y - 20, HorizontalAlignment.Center);
+        PlaceLabel(label, center, y);
     }
 
-    private void DrawVerticalDimension(double x, double y0, double y1, string text)
+    private void DrawVerticalDimension(
+        double x,
+        double y0,
+        double y1,
+        string text)
     {
         var stroke = new SolidColorBrush(Color.FromRgb(92, 105, 115));
+
+        var label = CreateLabel(text);
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var top = Math.Min(y0, y1);
+        var bottom = Math.Max(y0, y1);
+        var center = (top + bottom) / 2;
+        var gap = label.DesiredSize.Height / 2 + 7;
 
         _canvas.Children.Add(new Line
         {
             X1 = x,
             X2 = x,
-            Y1 = y0,
-            Y2 = y1,
+            Y1 = top,
+            Y2 = Math.Max(top, center - gap),
+            Stroke = stroke,
+            StrokeThickness = 1
+        });
+
+        _canvas.Children.Add(new Line
+        {
+            X1 = x,
+            X2 = x,
+            Y1 = Math.Min(bottom, center + gap),
+            Y2 = bottom,
             Stroke = stroke,
             StrokeThickness = 1
         });
@@ -318,10 +490,14 @@ public sealed class SeamCutWindow : Window
         DrawTick(x, y0, false, stroke);
         DrawTick(x, y1, false, stroke);
 
-        AddLabel(text, x, (y0 + y1) / 2, HorizontalAlignment.Center);
+        PlaceLabel(label, x, center);
     }
 
-    private void DrawTick(double x, double y, bool vertical, Brush stroke)
+    private void DrawTick(
+        double x,
+        double y,
+        bool vertical,
+        Brush stroke)
     {
         _canvas.Children.Add(new Line
         {
@@ -334,11 +510,11 @@ public sealed class SeamCutWindow : Window
         });
     }
 
-    private void AddLabel(string text, double x, double y, HorizontalAlignment alignment)
+    private Border CreateLabel(string text)
     {
-        var border = new Border
+        return new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(240, 255, 255, 255)),
+            Background = Brushes.White,
             Padding = new Thickness(4, 2, 4, 2),
             Child = new TextBlock
             {
@@ -348,11 +524,47 @@ public sealed class SeamCutWindow : Window
                 Foreground = new SolidColorBrush(Color.FromRgb(55, 69, 79))
             }
         };
+    }
 
-        border.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+    private void PlaceLabel(
+        Border label,
+        double x,
+        double y)
+    {
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
-        Canvas.SetLeft(border, x - border.DesiredSize.Width / 2);
-        Canvas.SetTop(border, y - border.DesiredSize.Height / 2);
-        _canvas.Children.Add(border);
+        Canvas.SetLeft(
+            label,
+            x - label.DesiredSize.Width / 2);
+
+        Canvas.SetTop(
+            label,
+            y - label.DesiredSize.Height / 2);
+
+        _canvas.Children.Add(label);
+    }
+
+    private void AddLegend(
+        string text,
+        double x,
+        double y,
+        HorizontalAlignment alignment)
+    {
+        var label = CreateLabel(text);
+        label.Background =
+            new SolidColorBrush(Color.FromArgb(245, 255, 255, 255));
+
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var left = alignment switch
+        {
+            HorizontalAlignment.Left => x,
+            HorizontalAlignment.Right => x - label.DesiredSize.Width,
+            _ => x - label.DesiredSize.Width / 2
+        };
+
+        Canvas.SetLeft(label, Math.Max(0, left));
+        Canvas.SetTop(label, Math.Max(0, y));
+        _canvas.Children.Add(label);
     }
 }
