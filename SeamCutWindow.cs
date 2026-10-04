@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
@@ -27,14 +28,22 @@ public sealed record SeamCutData(
 public sealed class SeamCutWindow : Window
 {
     private readonly SeamCutData _data;
-    private readonly Canvas _canvas = new();
+    private readonly Canvas _viewport = new();
+    private readonly Canvas _drawingCanvas = new();
     private readonly ComboBox _unitCombo = new();
 
     private TextBlock? _coilValueText;
     private TextBlock? _visibleValueText;
 
-    private bool UseCentimeters =>
-        _unitCombo.SelectedIndex <= 0;
+    private readonly ScaleTransform _zoomTransform = new(1, 1);
+    private readonly TranslateTransform _panTransform = new();
+    private readonly TransformGroup _drawingTransform = new();
+
+    private bool _isPanning;
+    private Point _lastPanPoint;
+    private double _zoom = 1.0;
+
+    private bool UseCentimeters => _unitCombo.SelectedIndex <= 0;
 
     private static readonly CultureInfo GermanCulture =
         CultureInfo.GetCultureInfo("de-DE");
@@ -55,6 +64,10 @@ public sealed class SeamCutWindow : Window
         ResizeMode = ResizeMode.CanResize;
         Background = new SolidColorBrush(Color.FromRgb(238, 242, 245));
 
+        _drawingTransform.Children.Add(_zoomTransform);
+        _drawingTransform.Children.Add(_panTransform);
+        _drawingCanvas.RenderTransform = _drawingTransform;
+
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -70,12 +83,21 @@ public sealed class SeamCutWindow : Window
             BorderBrush = new SolidColorBrush(Color.FromRgb(215, 222, 229)),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(9),
-            Padding = new Thickness(10)
+            Padding = new Thickness(10),
+            ClipToBounds = true
         };
 
-        _canvas.Background = Brushes.Transparent;
-        _canvas.SizeChanged += (_, _) => DrawCut();
-        viewerBorder.Child = _canvas;
+        _viewport.Background = Brushes.White;
+        _viewport.ClipToBounds = true;
+        _viewport.Children.Add(_drawingCanvas);
+
+        _viewport.SizeChanged += (_, _) => DrawCut();
+        _viewport.PreviewMouseWheel += Viewport_PreviewMouseWheel;
+        _viewport.PreviewMouseRightButtonDown += Viewport_PreviewMouseRightButtonDown;
+        _viewport.PreviewMouseRightButtonUp += Viewport_PreviewMouseRightButtonUp;
+        _viewport.PreviewMouseMove += Viewport_PreviewMouseMove;
+
+        viewerBorder.Child = _viewport;
 
         Grid.SetRow(viewerBorder, 1);
         root.Children.Add(viewerBorder);
@@ -85,6 +107,7 @@ public sealed class SeamCutWindow : Window
         Loaded += (_, _) =>
         {
             UpdateHeaderValues();
+            ResetView();
             DrawCut();
         };
     }
@@ -119,6 +142,14 @@ public sealed class SeamCutWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(112, 128, 139))
         });
 
+        left.Children.Add(new TextBlock
+        {
+            Text = "Mausrad: Zoom · rechte Maustaste: verschieben",
+            Margin = new Thickness(0, 2, 0, 0),
+            FontSize = 9.5,
+            Foreground = new SolidColorBrush(Color.FromRgb(139, 150, 158))
+        });
+
         grid.Children.Add(left);
 
         var right = new StackPanel
@@ -145,6 +176,20 @@ public sealed class SeamCutWindow : Window
             DrawCut();
         };
         right.Children.Add(_unitCombo);
+
+        var resetButton = new Button
+        {
+            Content = "Ansicht",
+            Height = 30,
+            Margin = new Thickness(8, 0, 0, 0),
+            Padding = new Thickness(9, 0, 9, 0),
+            Background = new SolidColorBrush(Color.FromRgb(239, 243, 246)),
+            Foreground = new SolidColorBrush(Color.FromRgb(52, 67, 77)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(211, 219, 226)),
+            BorderThickness = new Thickness(1)
+        };
+        resetButton.Click += (_, _) => ResetView();
+        right.Children.Add(resetButton);
 
         var closeButton = new Button
         {
@@ -204,28 +249,91 @@ public sealed class SeamCutWindow : Window
 
     private string FormatLength(double valueMm)
     {
-        if (UseCentimeters)
-        {
-            return $"{(valueMm / 10.0).ToString("0.#", GermanCulture)} cm";
-        }
+        return UseCentimeters
+            ? $"{(valueMm / 10.0).ToString("0.#", GermanCulture)} cm"
+            : $"{valueMm.ToString("0.#", GermanCulture)} mm";
+    }
 
-        return $"{valueMm.ToString("0.#", GermanCulture)} mm";
+    private void ResetView()
+    {
+        _zoom = 1.0;
+        _zoomTransform.ScaleX = 1.0;
+        _zoomTransform.ScaleY = 1.0;
+        _panTransform.X = 0;
+        _panTransform.Y = 0;
+    }
+
+    private void Viewport_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var mouse = e.GetPosition(_viewport);
+        var oldZoom = _zoom;
+        var factor = e.Delta > 0 ? 1.12 : 0.89;
+
+        _zoom = Math.Clamp(_zoom * factor, 0.55, 4.0);
+        if (Math.Abs(_zoom - oldZoom) < 0.0001)
+            return;
+
+        var worldX = (mouse.X - _panTransform.X) / oldZoom;
+        var worldY = (mouse.Y - _panTransform.Y) / oldZoom;
+
+        _zoomTransform.ScaleX = _zoom;
+        _zoomTransform.ScaleY = _zoom;
+
+        _panTransform.X = mouse.X - worldX * _zoom;
+        _panTransform.Y = mouse.Y - worldY * _zoom;
+
+        e.Handled = true;
+    }
+
+    private void Viewport_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = true;
+        _lastPanPoint = e.GetPosition(_viewport);
+        _viewport.CaptureMouse();
+        Mouse.OverrideCursor = Cursors.SizeAll;
+        e.Handled = true;
+    }
+
+    private void Viewport_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = false;
+        _viewport.ReleaseMouseCapture();
+        Mouse.OverrideCursor = null;
+        e.Handled = true;
+    }
+
+    private void Viewport_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isPanning || e.RightButton != MouseButtonState.Pressed)
+            return;
+
+        var current = e.GetPosition(_viewport);
+        var delta = current - _lastPanPoint;
+
+        _panTransform.X += delta.X;
+        _panTransform.Y += delta.Y;
+
+        _lastPanPoint = current;
+        e.Handled = true;
     }
 
     private void DrawCut()
     {
-        _canvas.Children.Clear();
+        _drawingCanvas.Children.Clear();
 
-        var width = _canvas.ActualWidth;
-        var height = _canvas.ActualHeight;
+        var width = _viewport.ActualWidth;
+        var height = _viewport.ActualHeight;
 
         if (width < 100 || height < 100)
             return;
 
-        const double marginLeft = 95;
-        const double marginRight = 105;
-        const double marginTop = 58;
-        const double marginBottom = 70;
+        _drawingCanvas.Width = width;
+        _drawingCanvas.Height = height;
+
+        const double marginLeft = 100;
+        const double marginRight = 110;
+        const double marginTop = 115;
+        const double marginBottom = 82;
 
         var availableWidth = Math.Max(100, width - marginLeft - marginRight);
         var availableHeight = Math.Max(100, height - marginTop - marginBottom);
@@ -243,18 +351,31 @@ public sealed class SeamCutWindow : Window
 
         var bottomBase = marginTop + availableHeight;
         var leftBottom = bottomBase;
-        var rightBottom =
-            bottomBase - _data.BottomDeltaMm * scale;
+        var rightBottom = bottomBase - _data.BottomDeltaMm * scale;
 
-        var leftTop =
-            leftBottom - _data.StartHeightMm * scale;
-        var rightTop =
-            rightBottom - _data.EndHeightMm * scale;
+        var leftTop = leftBottom - _data.StartHeightMm * scale;
+        var rightTop = rightBottom - _data.EndHeightMm * scale;
 
         var pBottomLeft = new Point(x0, leftBottom);
         var pBottomRight = new Point(x1, rightBottom);
         var pTopRight = new Point(x1, rightTop);
         var pTopLeft = new Point(x0, leftTop);
+
+        var startFoldX = x0 + _data.StartFoldMm * scale;
+        var endFoldX = x1 - _data.EndFoldMm * scale;
+
+        // Falzzonen zuerst, damit ihre Bedeutung optisch klar ist.
+        DrawFoldBand(
+            new Point(x0, leftBottom),
+            new Point(x0, leftTop),
+            new Point(startFoldX, leftTop),
+            new Point(startFoldX, leftBottom));
+
+        DrawFoldBand(
+            new Point(endFoldX, rightBottom),
+            new Point(endFoldX, rightTop),
+            new Point(x1, rightTop),
+            new Point(x1, rightBottom));
 
         var polygon = new Polygon
         {
@@ -265,26 +386,16 @@ public sealed class SeamCutWindow : Window
                 pTopRight,
                 pTopLeft
             },
-            Fill = new SolidColorBrush(Color.FromRgb(231, 236, 240)),
+            Fill = new SolidColorBrush(Color.FromArgb(195, 231, 236, 240)),
             Stroke = new SolidColorBrush(Color.FromRgb(45, 61, 72)),
             StrokeThickness = 1.6
         };
 
-        _canvas.Children.Add(polygon);
+        _drawingCanvas.Children.Add(polygon);
 
-        // Seitenfalze.
-        DrawFoldLine(
-            x0 + _data.StartFoldMm * scale,
-            leftBottom,
-            leftTop);
+        DrawFoldLine(startFoldX, leftBottom, leftTop);
+        DrawFoldLine(endFoldX, rightBottom, rightTop);
 
-        DrawFoldLine(
-            x1 - _data.EndFoldMm * scale,
-            rightBottom,
-            rightTop);
-
-        // Obere und untere Umschlaglinien werden als echte, parallele
-        // gestrichelte Linien innerhalb des Zuschnitts dargestellt.
         DrawAllowanceLine(
             pTopLeft,
             pTopRight,
@@ -297,63 +408,79 @@ public sealed class SeamCutWindow : Window
             new Point((x0 + x1) / 2, (leftTop + rightTop) / 2),
             _data.BottomAllowanceMm * scale);
 
+        // Maßkette oben: Falz | Deckbreite | Falz.
+        var topDimensionY =
+            Math.Max(35, Math.Min(leftTop, rightTop) - 46);
+
+        DrawDimensionSegment(
+            x0,
+            startFoldX,
+            topDimensionY,
+            $"{_data.StartFoldName} {FormatLength(_data.StartFoldMm)}");
+
+        DrawDimensionSegment(
+            startFoldX,
+            endFoldX,
+            topDimensionY - 28,
+            $"Deckbreite {FormatLength(_data.VisibleWidthMm)}");
+
+        DrawDimensionSegment(
+            endFoldX,
+            x1,
+            topDimensionY,
+            $"{_data.EndFoldName} {FormatLength(_data.EndFoldMm)}");
+
         DrawHorizontalDimension(
             x0,
             x1,
-            Math.Min(height - 24, Math.Max(leftBottom, rightBottom) + 34),
+            Math.Min(height - 28, Math.Max(leftBottom, rightBottom) + 40),
             $"{FormatLength(_data.RawWidthMm)} Rohbreite");
 
         DrawVerticalDimension(
-            x0 - 46,
+            x0 - 50,
             leftBottom,
             leftTop,
             FormatLength(_data.StartHeightMm));
 
         DrawVerticalDimension(
-            x1 + 46,
+            x1 + 50,
             rightBottom,
             rightTop,
             FormatLength(_data.EndHeightMm));
 
-        // Kleine Legende außerhalb der Maßlinien statt Texte über die Zeichnung.
-        AddLegend(
-            $"{_data.StartFoldName}: {FormatLength(_data.StartFoldMm)}",
-            x0,
-            14,
-            HorizontalAlignment.Left);
-
         AddLegend(
             $"oben: +{FormatLength(_data.TopAllowanceMm)}",
             (x0 + x1) / 2,
-            14,
+            Math.Max(6, topDimensionY - 58),
             HorizontalAlignment.Center);
-
-        AddLegend(
-            $"{_data.EndFoldName}: {FormatLength(_data.EndFoldMm)}",
-            x1,
-            14,
-            HorizontalAlignment.Right);
 
         AddLegend(
             $"unten: +{FormatLength(_data.BottomAllowanceMm)}",
             (x0 + x1) / 2,
-            Math.Min(height - 48, Math.Max(leftBottom, rightBottom) + 8),
+            Math.Min(height - 50, Math.Max(leftBottom, rightBottom) + 10),
             HorizontalAlignment.Center);
     }
 
-    private void DrawFoldLine(
-        double x,
-        double bottom,
-        double top)
+    private void DrawFoldBand(Point p1, Point p2, Point p3, Point p4)
     {
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Polygon
+        {
+            Points = new PointCollection { p1, p2, p3, p4 },
+            Fill = new SolidColorBrush(Color.FromArgb(80, 113, 164, 191)),
+            StrokeThickness = 0
+        });
+    }
+
+    private void DrawFoldLine(double x, double bottom, double top)
+    {
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = x,
             X2 = x,
             Y1 = bottom,
             Y2 = top,
             Stroke = new SolidColorBrush(Color.FromRgb(72, 119, 145)),
-            StrokeThickness = 1.1,
+            StrokeThickness = 1.15,
             StrokeDashArray = new DoubleCollection { 4, 3 }
         });
     }
@@ -399,16 +526,50 @@ public sealed class SeamCutWindow : Window
             b.X + nx * distance,
             b.Y + ny * distance);
 
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = oa.X,
             X2 = ob.X,
             Y1 = oa.Y,
             Y2 = ob.Y,
             Stroke = new SolidColorBrush(Color.FromRgb(72, 119, 145)),
-            StrokeThickness = 1.1,
+            StrokeThickness = 1.15,
             StrokeDashArray = new DoubleCollection { 5, 3 }
         });
+    }
+
+    private void DrawDimensionSegment(
+        double x0,
+        double x1,
+        double y,
+        string text)
+    {
+        var stroke = new SolidColorBrush(Color.FromRgb(92, 105, 115));
+
+        _drawingCanvas.Children.Add(new Line
+        {
+            X1 = x0,
+            X2 = x1,
+            Y1 = y,
+            Y2 = y,
+            Stroke = stroke,
+            StrokeThickness = 1
+        });
+
+        DrawTick(x0, y, true, stroke);
+        DrawTick(x1, y, true, stroke);
+
+        var label = CreateLabel(text);
+        label.Child = new TextBlock
+        {
+            Text = text,
+            FontSize = 9.2,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(55, 69, 79)),
+            TextAlignment = TextAlignment.Center
+        };
+
+        PlaceLabel(label, (x0 + x1) / 2, y - 13);
     }
 
     private void DrawHorizontalDimension(
@@ -425,7 +586,7 @@ public sealed class SeamCutWindow : Window
         var center = (x0 + x1) / 2;
         var gap = label.DesiredSize.Width / 2 + 7;
 
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = x0,
             X2 = Math.Max(x0, center - gap),
@@ -435,7 +596,7 @@ public sealed class SeamCutWindow : Window
             StrokeThickness = 1
         });
 
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = Math.Min(x1, center + gap),
             X2 = x1,
@@ -467,7 +628,7 @@ public sealed class SeamCutWindow : Window
         var center = (top + bottom) / 2;
         var gap = label.DesiredSize.Height / 2 + 7;
 
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = x,
             X2 = x,
@@ -477,7 +638,7 @@ public sealed class SeamCutWindow : Window
             StrokeThickness = 1
         });
 
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = x,
             X2 = x,
@@ -499,7 +660,7 @@ public sealed class SeamCutWindow : Window
         bool vertical,
         Brush stroke)
     {
-        _canvas.Children.Add(new Line
+        _drawingCanvas.Children.Add(new Line
         {
             X1 = vertical ? x : x - 5,
             X2 = vertical ? x : x + 5,
@@ -541,7 +702,7 @@ public sealed class SeamCutWindow : Window
             label,
             y - label.DesiredSize.Height / 2);
 
-        _canvas.Children.Add(label);
+        _drawingCanvas.Children.Add(label);
     }
 
     private void AddLegend(
@@ -565,6 +726,6 @@ public sealed class SeamCutWindow : Window
 
         Canvas.SetLeft(label, Math.Max(0, left));
         Canvas.SetTop(label, Math.Max(0, y));
-        _canvas.Children.Add(label);
+        _drawingCanvas.Children.Add(label);
     }
 }
