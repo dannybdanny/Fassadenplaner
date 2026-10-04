@@ -1117,9 +1117,14 @@ public partial class MainWindow : Window
             .FirstOrDefault(p => p.Number == _selectedSeamPanNumber.Value);
     }
 
-    private void SelectSeamPan(int panNumber)
+    private void SelectSeamPan(string surfaceKey, int panNumber)
     {
+        _selectedSurfaceKey = surfaceKey;
+        LoadSeamDistributionSettings(surfaceKey);
         _selectedSeamPanNumber = panNumber;
+
+        SurfaceDetailPanel.Visibility = Visibility.Visible;
+        UpdateSurfaceDetail();
         UpdateSeamPanel();
         BuildDormer(resetView: false);
     }
@@ -1165,12 +1170,12 @@ public partial class MainWindow : Window
         window.Show();
     }
 
-    private int? HitTestSeamPan(Point clickPoint)
+    private (string SurfaceKey, int PanNumber)? HitTestSeamPan(Point clickPoint)
     {
         if (!_seamToolActive || _seamPanModels.Count == 0)
             return null;
 
-        int? panNumber = null;
+        (string SurfaceKey, int PanNumber)? hitPan = null;
 
         VisualTreeHelper.HitTest(
             DormerViewport,
@@ -1181,7 +1186,7 @@ public partial class MainWindow : Window
                     ray.ModelHit is GeometryModel3D model &&
                     _seamPanModels.TryGetValue(model, out var found))
                 {
-                    panNumber = found;
+                    hitPan = found;
                     return HitTestResultBehavior.Stop;
                 }
 
@@ -1189,7 +1194,7 @@ public partial class MainWindow : Window
             },
             new PointHitTestParameters(clickPoint));
 
-        return panNumber;
+        return hitPan;
     }
 
     private static Point3D Lerp(Point3D a, Point3D b, double t)
@@ -2083,21 +2088,29 @@ public partial class MainWindow : Window
 
             if (_seamToolActive)
             {
-                var panNumber = HitTestSeamPan(clickPoint);
+                var panHit = HitTestSeamPan(clickPoint);
 
-                if (panNumber is not null)
+                if (panHit is not null)
                 {
                     var now = DateTime.UtcNow;
+                    var sameSurface =
+                        _selectedSurfaceKey == panHit.Value.SurfaceKey;
+
                     var isDoubleClick =
-                        _lastClickedSeamPanNumber == panNumber.Value &&
+                        sameSurface &&
+                        _lastClickedSeamPanNumber == panHit.Value.PanNumber &&
                         (now - _lastSeamPanClickUtc).TotalMilliseconds <= 500;
 
-                    SelectSeamPan(panNumber.Value);
+                    SelectSeamPan(
+                        panHit.Value.SurfaceKey,
+                        panHit.Value.PanNumber);
 
-                    _lastClickedSeamPanNumber = panNumber.Value;
+                    _lastClickedSeamPanNumber =
+                        panHit.Value.PanNumber;
                     _lastSeamPanClickUtc = now;
 
-                    if (isDoubleClick)
+                    if (isDoubleClick &&
+                        panHit.Value.SurfaceKey is "left-cheek" or "right-cheek")
                     {
                         _lastClickedSeamPanNumber = null;
                         _lastSeamPanClickUtc = DateTime.MinValue;
@@ -3076,12 +3089,8 @@ public partial class MainWindow : Window
 
     private void AddSeamPanNumberLabelsToOverlay()
     {
-        if (!_seamToolActive ||
-            string.IsNullOrWhiteSpace(_seamPanLabelPrefix) ||
-            _seamPanLabelAnchors.Count == 0)
-        {
+        if (!_seamToolActive || _seamPanLabelAnchors.Count == 0)
             return;
-        }
 
         foreach (var pair in _seamPanLabelAnchors.OrderBy(p => p.Key))
         {
@@ -3089,7 +3098,19 @@ public partial class MainWindow : Window
             if (projected is null)
                 continue;
 
-            var selected = _selectedSeamPanNumber == pair.Key;
+            var parts = pair.Key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var prefix = parts.Length > 0 ? parts[0] : string.Empty;
+            var number =
+                parts.Length > 1 &&
+                int.TryParse(parts[1], out var parsed)
+                    ? parsed
+                    : 0;
+
+            var selected =
+                _selectedSeamPanNumber == number &&
+                ((_selectedSurfaceKey == "left-cheek" && prefix == "WL") ||
+                 (_selectedSurfaceKey == "right-cheek" && prefix == "WR") ||
+                 (_selectedSurfaceKey == "front" && prefix == "GF"));
 
             var label = new Border
             {
@@ -3107,7 +3128,7 @@ public partial class MainWindow : Window
                 Padding = new Thickness(4, 1, 4, 1),
                 Child = new TextBlock
                 {
-                    Text = $"{_seamPanLabelPrefix} {pair.Key}",
+                    Text = pair.Key,
                     FontSize = 9.5,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Color.FromRgb(45, 66, 80))
@@ -3119,13 +3140,13 @@ public partial class MainWindow : Window
                     double.PositiveInfinity,
                     double.PositiveInfinity));
 
-            var left =
-                projected.Value.X - label.DesiredSize.Width / 2.0;
-            var top =
-                projected.Value.Y - label.DesiredSize.Height / 2.0;
+            Canvas.SetLeft(
+                label,
+                projected.Value.X - label.DesiredSize.Width / 2.0);
+            Canvas.SetTop(
+                label,
+                projected.Value.Y - label.DesiredSize.Height / 2.0);
 
-            Canvas.SetLeft(label, left);
-            Canvas.SetTop(label, top);
             DimensionOverlay.Children.Add(label);
         }
     }
