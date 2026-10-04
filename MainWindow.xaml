@@ -552,6 +552,68 @@
                                     Padding="10"
                                     Margin="0,0,0,9">
                                 <StackPanel>
+                                    <TextBlock Text="Herstellung"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#53636F"/>
+
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <RadioButton x:Name="MachineProfileRadio"
+                                                     Grid.Column="0"
+                                                     GroupName="CladdingMode"
+                                                     IsChecked="True"
+                                                     Checked="CladdingMode_Checked"
+                                                     VerticalContentAlignment="Center">
+                                            <StackPanel>
+                                                <TextBlock Text="⚙  Maschinell"
+                                                           FontSize="10.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#334753"/>
+                                                <TextBlock Text="Deckmaß automatisch"
+                                                           FontSize="9"
+                                                           Foreground="#87939C"/>
+                                            </StackPanel>
+                                        </RadioButton>
+
+                                        <RadioButton x:Name="ManualProfileRadio"
+                                                     Grid.Column="2"
+                                                     GroupName="CladdingMode"
+                                                     Checked="CladdingMode_Checked"
+                                                     VerticalContentAlignment="Center">
+                                            <StackPanel>
+                                                <TextBlock Text="✋  Handgekantet"
+                                                           FontSize="10.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#334753"/>
+                                                <TextBlock Text="Deckmaß selbst eingeben"
+                                                           FontSize="9"
+                                                           Foreground="#87939C"/>
+                                            </StackPanel>
+                                        </RadioButton>
+                                    </Grid>
+
+                                    <TextBlock x:Name="CladdingModeHintText"
+                                               Text="Winkelstehfalz 25 mm · ca. 70 mm Falzverlust"
+                                               Margin="0,6,0,0"
+                                               FontSize="9.5"
+                                               Foreground="#7D8992"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#F7F9FB"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,9">
+                                <StackPanel>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="34"/>
@@ -617,6 +679,8 @@
                                                         <TextBox x:Name="DeckWidthBox"
                                                                  Height="32"
                                                                  Text="430"
+                                                                 IsReadOnly="True"
+                                                                 Background="#F1F4F6"
                                                                  TextChanged="CladdingValue_TextChanged"/>
                                                         <TextBlock Grid.Column="1"
                                                                    Text="mm"
@@ -644,7 +708,7 @@
                                                            Foreground="#31566B"/>
                                             </Grid>
 
-                                            <TextBlock Text="Standard: Winkelstehfalz 25 mm · Profiliermaschine"
+                                            <TextBlock Text="Bei maschineller Profilierung wird die Deckbreite automatisch aus dem Coil berechnet."
                                                        Margin="0,3,0,0"
                                                        FontSize="9.5"
                                                        Foreground="#8A969F"
