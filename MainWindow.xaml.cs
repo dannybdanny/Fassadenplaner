@@ -1221,7 +1221,8 @@ public partial class MainWindow : Window
         return inside;
     }
 
-    private void AddSelectedCheekSeamLines(
+    private void AddCheekSeamLines(
+        string surfaceKey,
         Point3D frontBottom,
         Point3D frontTop,
         Point3D backPoint)
@@ -1229,7 +1230,7 @@ public partial class MainWindow : Window
         if (!_seamToolActive)
             return;
 
-        var pans = CalculateCheekSeamPans();
+        var pans = CalculateSurfaceSeamPans(surfaceKey);
         if (pans.Count <= 1 || _depthMm <= 0)
             return;
 
@@ -1239,22 +1240,14 @@ public partial class MainWindow : Window
         foreach (var pan in pans.Take(pans.Count - 1))
         {
             var t = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
-
-            var bottom = new Point3D(
-                frontBottom.X + (backPoint.X - frontBottom.X) * t,
-                frontBottom.Y + (backPoint.Y - frontBottom.Y) * t,
-                frontBottom.Z + (backPoint.Z - frontBottom.Z) * t);
-
-            var top = new Point3D(
-                frontTop.X + (backPoint.X - frontTop.X) * t,
-                frontTop.Y + (backPoint.Y - frontTop.Y) * t,
-                frontTop.Z + (backPoint.Z - frontTop.Z) * t);
-
+            var bottom = Lerp(frontBottom, backPoint, t);
+            var top = Lerp(frontTop, backPoint, t);
             AddPassiveEdge(bottom, top, seamBrush, 0.0055);
         }
     }
 
-    private void AddInteractiveSeamPanSurfaces(
+    private void AddInteractiveCheekSeamPanSurfaces(
+        string surfaceKey,
         Point3D frontBottom,
         Point3D frontTop,
         Point3D backPoint,
@@ -1263,11 +1256,12 @@ public partial class MainWindow : Window
         if (!_seamToolActive)
             return;
 
-        var pans = CalculateCheekSeamPans();
+        var pans = CalculateSurfaceSeamPans(surfaceKey);
         if (pans.Count == 0 || _depthMm <= 0)
             return;
 
         var offset = isLeft ? -0.010 : 0.010;
+        var prefix = GetSurfacePanPrefix(surfaceKey);
 
         foreach (var pan in pans)
         {
@@ -1285,12 +1279,10 @@ public partial class MainWindow : Window
             top1.X += offset;
 
             var mesh = new MeshGeometry3D();
-
             mesh.Positions.Add(b0);
             mesh.Positions.Add(b1);
             mesh.Positions.Add(top1);
             mesh.Positions.Add(top0);
-
             mesh.TriangleIndices.Add(0);
             mesh.TriangleIndices.Add(1);
             mesh.TriangleIndices.Add(2);
@@ -1298,7 +1290,9 @@ public partial class MainWindow : Window
             mesh.TriangleIndices.Add(2);
             mesh.TriangleIndices.Add(3);
 
-            var selected = _selectedSeamPanNumber == pan.Number;
+            var selected =
+                _selectedSurfaceKey == surfaceKey &&
+                _selectedSeamPanNumber == pan.Number;
 
             var brush = new SolidColorBrush(
                 selected
@@ -1312,16 +1306,103 @@ public partial class MainWindow : Window
                 BackMaterial = material
             };
 
-            _seamPanModels[model] = pan.Number;
+            _seamPanModels[model] = (surfaceKey, pan.Number);
 
-            _seamPanLabelPrefix = isLeft ? "WL" : "WR";
-
-            // Beschriftung immer mittig auf der sichtbaren Schar.
             var labelBottom = Lerp(b0, b1, 0.5);
             var labelTop = Lerp(top0, top1, 0.5);
-            var labelAnchor = Lerp(labelBottom, labelTop, 0.5);
+            _seamPanLabelAnchors[$"{prefix} {pan.Number}"] =
+                Lerp(labelBottom, labelTop, 0.5);
 
-            _seamPanLabelAnchors[pan.Number] = labelAnchor;
+            DormerViewport.Children.Add(new ModelVisual3D
+            {
+                Content = model
+            });
+        }
+    }
+
+    private void AddFrontSeams(
+        Point3D bottomLeft,
+        Point3D bottomRight,
+        Point3D topRight,
+        Point3D topLeft,
+        Point3D? apex = null)
+    {
+        if (!_seamToolActive || _widthMm <= 0)
+            return;
+
+        const string surfaceKey = "front";
+        var pans = CalculateSurfaceSeamPans(surfaceKey);
+        if (pans.Count == 0)
+            return;
+
+        var prefix = GetSurfacePanPrefix(surfaceKey);
+        var seamBrush = new SolidColorBrush(Color.FromRgb(48, 104, 132));
+        seamBrush.Freeze();
+
+        Point3D FrontTopAt(double t)
+        {
+            if (apex is null)
+                return Lerp(topLeft, topRight, t);
+
+            if (t <= 0.5)
+                return Lerp(topLeft, apex.Value, t / 0.5);
+
+            return Lerp(apex.Value, topRight, (t - 0.5) / 0.5);
+        }
+
+        foreach (var pan in pans)
+        {
+            var t0 = Math.Clamp(pan.VisibleStartMm / _widthMm, 0, 1);
+            var t1 = Math.Clamp(pan.VisibleEndMm / _widthMm, 0, 1);
+
+            var b0 = Lerp(bottomLeft, bottomRight, t0);
+            var b1 = Lerp(bottomLeft, bottomRight, t1);
+            var top0 = FrontTopAt(t0);
+            var top1 = FrontTopAt(t1);
+
+            if (pan.Number < pans.Count)
+                AddPassiveEdge(b1, top1, seamBrush, 0.0055);
+
+            var zOffset = 0.010;
+            b0.Z += zOffset;
+            b1.Z += zOffset;
+            top0.Z += zOffset;
+            top1.Z += zOffset;
+
+            var mesh = new MeshGeometry3D();
+            mesh.Positions.Add(b0);
+            mesh.Positions.Add(b1);
+            mesh.Positions.Add(top1);
+            mesh.Positions.Add(top0);
+            mesh.TriangleIndices.Add(0);
+            mesh.TriangleIndices.Add(1);
+            mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(0);
+            mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(3);
+
+            var selected =
+                _selectedSurfaceKey == surfaceKey &&
+                _selectedSeamPanNumber == pan.Number;
+
+            var brush = new SolidColorBrush(
+                selected
+                    ? Color.FromArgb(115, 67, 142, 181)
+                    : Color.FromArgb(18, 67, 142, 181));
+            brush.Freeze();
+
+            var material = new DiffuseMaterial(brush);
+            var model = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            };
+
+            _seamPanModels[model] = (surfaceKey, pan.Number);
+
+            var labelBottom = Lerp(b0, b1, 0.5);
+            var labelTop = Lerp(top0, top1, 0.5);
+            _seamPanLabelAnchors[$"{prefix} {pan.Number}"] =
+                Lerp(labelBottom, labelTop, 0.5);
 
             DormerViewport.Children.Add(new ModelVisual3D
             {
@@ -1737,7 +1818,6 @@ public partial class MainWindow : Window
         _dimensionAnchors.Clear();
         _seamPanModels.Clear();
         _seamPanLabelAnchors.Clear();
-        _seamPanLabelPrefix = string.Empty;
 
         var lights = new Model3DGroup();
         lights.Children.Add(new AmbientLight(Color.FromRgb(245, 245, 245)));
@@ -1777,20 +1857,27 @@ public partial class MainWindow : Window
         AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush, "left-cheek");
         AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush, "right-cheek");
 
-        if (_seamToolActive && _selectedSurfaceKey == "left-cheek")
+        if (_seamToolActive)
         {
-            AddSelectedCheekSeamLines(frontBottomLeft, frontTopLeft, backIntersectionLeft);
-            AddInteractiveSeamPanSurfaces(
+            AddCheekSeamLines(
+                "left-cheek",
+                frontBottomLeft,
+                frontTopLeft,
+                backIntersectionLeft);
+            AddInteractiveCheekSeamPanSurfaces(
+                "left-cheek",
                 frontBottomLeft,
                 frontTopLeft,
                 backIntersectionLeft,
                 isLeft: true);
-        }
 
-        if (_seamToolActive && _selectedSurfaceKey == "right-cheek")
-        {
-            AddSelectedCheekSeamLines(frontBottomRight, frontTopRight, backIntersectionRight);
-            AddInteractiveSeamPanSurfaces(
+            AddCheekSeamLines(
+                "right-cheek",
+                frontBottomRight,
+                frontTopRight,
+                backIntersectionRight);
+            AddInteractiveCheekSeamPanSurfaces(
+                "right-cheek",
                 frontBottomRight,
                 frontTopRight,
                 backIntersectionRight,
@@ -1815,6 +1902,13 @@ public partial class MainWindow : Window
             // Flachdach- oder Schleppdachgaube: geschlossene Front.
             // Bei der Schleppdachgaube steigt die obere Fläche standardmäßig mit 10° nach hinten an.
             AddQuadSurface(frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft, _dormerFrontBrush, "front");
+
+            if (_seamToolActive)
+                AddFrontSeams(
+                    frontBottomLeft,
+                    frontBottomRight,
+                    frontTopRight,
+                    frontTopLeft);
             AddQuadSurface(frontTopLeft, frontTopRight, backIntersectionRight, backIntersectionLeft, _dormerTopBrush);
 
             AddEdge(frontTopLeft, frontTopRight, WidthKey);
@@ -1846,6 +1940,14 @@ public partial class MainWindow : Window
                 frontTopLeft,
                 _dormerFrontBrush,
                 "front");
+
+            if (_seamToolActive)
+                AddFrontSeams(
+                    frontBottomLeft,
+                    frontBottomRight,
+                    frontTopRight,
+                    frontTopLeft,
+                    frontApex);
 
             // Beide Dachflächen der Satteldachgaube reichen bis in das Hauptdach.
             AddQuadSurface(frontTopLeft, frontApex, backRidge, backIntersectionLeft, _dormerTopBrush);
