@@ -217,7 +217,7 @@
         <Grid Grid.Row="1" Margin="18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="350"/>
+                <ColumnDefinition Width="330"/>
             </Grid.ColumnDefinitions>
 
             <!-- 3D-Viewer -->
@@ -294,17 +294,17 @@
                     BorderThickness="1"
                     CornerRadius="11">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="18">
+                    <StackPanel Margin="14">
 
                         <TextBlock x:Name="ToolPanelTitle"
                                    Text="Gaube"
-                                   FontSize="20"
+                                   FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="#1E2B35"/>
                         <TextBlock x:Name="ToolPanelSubtitle"
                                    Text="Geometrie, Maße und Flächen"
-                                   Margin="0,3,0,16"
-                                   FontSize="11"
+                                   Margin="0,2,0,10"
+                                   FontSize="10.5"
                                    Foreground="#80909B"/>
 
                         <!-- GAUBEN-EIGENSCHAFTEN -->
@@ -313,7 +313,7 @@
                             <TextBlock Text="GAUBENFORM"
                                        Style="{StaticResource SectionTitle}"/>
                             <ComboBox x:Name="DormerTypeCombo"
-                                      Margin="0,6,0,14"
+                                      Margin="0,4,0,9"
                                       SelectedIndex="0"
                                       SelectionChanged="DormerTypeCombo_SelectionChanged">
                                 <ComboBoxItem Content="Flachdachgaube"/>
@@ -323,7 +323,7 @@
 
                             <TextBlock Text="HAUPTDACHNEIGUNG"
                                        Style="{StaticResource SectionTitle}"/>
-                            <Grid Margin="0,6,0,14">
+                            <Grid Margin="0,4,0,9">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="32"/>
@@ -346,10 +346,10 @@
 
                             <StackPanel x:Name="DormerPitchPanel"
                                         Visibility="Collapsed"
-                                        Margin="0,0,0,14">
+                                        Margin="0,0,0,9">
                                 <TextBlock Text="GAUBENDACHNEIGUNG"
                                            Style="{StaticResource SectionTitle}"/>
-                                <Grid Margin="0,6,0,0">
+                                <Grid Margin="0,4,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="32"/>
@@ -374,24 +374,24 @@
                             <Border Background="#F5F7F9"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="14"
-                                    Margin="0,0,0,16">
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,10">
                                 <StackPanel>
                                     <TextBlock Text="AUSGEWÄHLTE KANTE"
                                                Style="{StaticResource SectionTitle}"/>
 
                                     <TextBlock x:Name="SelectedDimensionTitle"
                                                Text="Gaubenbreite"
-                                               Margin="0,4,0,3"
-                                               FontSize="18"
+                                               Margin="0,3,0,2"
+                                               FontSize="16"
                                                FontWeight="SemiBold"
                                                Foreground="#1D2B36"/>
 
                                     <TextBlock x:Name="SelectedDimensionHint"
                                                Text="Horizontale Kante der Gaubenfront"
-                                               Margin="0,0,0,11"
-                                               FontSize="11"
+                                               Margin="0,0,0,7"
+                                               FontSize="10.5"
                                                Foreground="#7B8792"
                                                TextWrapping="Wrap"/>
 
@@ -413,7 +413,8 @@
                                     </Grid>
 
                                     <Button Content="Maß übernehmen"
-                                            Margin="0,10,0,0"
+                                            Margin="0,7,0,0"
+                                            Height="32"
                                             Click="ApplyDimension_Click"/>
                                 </StackPanel>
                             </Border>
@@ -421,17 +422,17 @@
                             <TextBlock Text="AKTUELLE MAẞE"
                                        Style="{StaticResource LabelStyle}"/>
 
-                            <Grid Margin="0,9,0,0">
+                            <Grid Margin="0,6,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="28"/>
-                                    <RowDefinition Height="28"/>
-                                    <RowDefinition Height="28"/>
-                                    <RowDefinition Height="28"/>
-                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="24"/>
+                                    <RowDefinition Height="24"/>
+                                    <RowDefinition Height="24"/>
+                                    <RowDefinition Height="24"/>
+                                    <RowDefinition Height="24"/>
                                     <RowDefinition x:Name="ShedPitchRow" Height="0"/>
                                     <RowDefinition x:Name="GableRow" Height="0"/>
                                 </Grid.RowDefinitions>
@@ -460,11 +461,11 @@
 
                             <Border Height="1"
                                     Background="#E3E8EC"
-                                    Margin="0,15,0,15"/>
+                                    Margin="0,10,0,10"/>
 
                             <Border x:Name="SurfaceDetailPanel"
-                                    Height="245"
-                                    Padding="10"
+                                    Height="195"
+                                    Padding="8"
                                     CornerRadius="9"
                                     Background="#F8FAFB"
                                     BorderBrush="#D4DDE4"
@@ -505,15 +506,15 @@
                             <Border Background="#F5F7F9"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="14"
-                                    Margin="0,0,0,16">
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,10">
                                 <StackPanel>
                                     <TextBlock Text="MATERIAL / COIL"
                                                Style="{StaticResource SectionTitle}"/>
 
                                     <TextBlock Text="Material"
-                                               Margin="0,10,0,5"
+                                               Margin="0,7,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <ComboBox x:Name="CladdingMaterialCombo"
@@ -525,7 +526,7 @@
                                     </ComboBox>
 
                                     <TextBlock Text="Zinkcoil-Breite"
-                                               Margin="0,12,0,5"
+                                               Margin="0,8,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <Grid>
@@ -534,7 +535,7 @@
                                             <ColumnDefinition Width="44"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="CoilWidthBox"
-                                                 Text="670"
+                                                 Text="500"
                                                  TextChanged="CladdingValue_TextChanged"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="mm"
@@ -548,15 +549,15 @@
                             <Border Background="#F8FAFB"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="14"
-                                    Margin="0,0,0,16">
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,10">
                                 <StackPanel>
                                     <TextBlock Text="FALZ / DECKBREITE"
                                                Style="{StaticResource SectionTitle}"/>
 
                                     <TextBlock Text="Überdeck"
-                                               Margin="0,10,0,5"
+                                               Margin="0,7,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <Grid>
@@ -565,7 +566,7 @@
                                             <ColumnDefinition Width="44"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="OverlapBox"
-                                                 Text="35"
+                                                 Text="45"
                                                  TextChanged="CladdingValue_TextChanged"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="mm"
@@ -575,7 +576,7 @@
                                     </Grid>
 
                                     <TextBlock Text="Unterdeck"
-                                               Margin="0,10,0,5"
+                                               Margin="0,7,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <Grid>
@@ -584,7 +585,7 @@
                                             <ColumnDefinition Width="44"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="UnderlapBox"
-                                                 Text="25"
+                                                 Text="35"
                                                  TextChanged="CladdingValue_TextChanged"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="mm"
@@ -597,8 +598,8 @@
                                             BorderBrush="#D1DDE4"
                                             BorderThickness="1"
                                             CornerRadius="7"
-                                            Padding="11"
-                                            Margin="0,13,0,0">
+                                            Padding="8"
+                                            Margin="0,8,0,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -615,9 +616,9 @@
                                             </StackPanel>
                                             <TextBlock x:Name="DeckWidthText"
                                                        Grid.Column="1"
-                                                       Text="610 mm"
+                                                       Text="420 mm"
                                                        VerticalAlignment="Center"
-                                                       FontSize="19"
+                                                       FontSize="17"
                                                        FontWeight="SemiBold"
                                                        Foreground="#1E536B"/>
                                         </Grid>
@@ -628,14 +629,14 @@
                             <Border Background="#F8FAFB"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="14">
+                                    CornerRadius="8"
+                                    Padding="10">
                                 <StackPanel>
                                     <TextBlock Text="ZUGABEN / UMSCHLÄGE"
                                                Style="{StaticResource SectionTitle}"/>
 
                                     <TextBlock Text="Zugabe oben"
-                                               Margin="0,10,0,5"
+                                               Margin="0,7,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <Grid>
@@ -654,7 +655,7 @@
                                     </Grid>
 
                                     <TextBlock Text="Zugabe unten"
-                                               Margin="0,10,0,5"
+                                               Margin="0,7,0,3"
                                                FontSize="11"
                                                Foreground="#5D6B76"/>
                                     <Grid>
@@ -673,11 +674,11 @@
                                     </Grid>
 
                                     <TextBlock x:Name="CladdingSummaryText"
-                                               Margin="0,12,0,0"
-                                               FontSize="10.5"
+                                               Margin="0,8,0,0"
+                                               FontSize="10"
                                                Foreground="#7B8892"
                                                TextWrapping="Wrap"
-                                               Text="670 mm Coil → 610 mm Deckbreite · oben 25 mm · unten 30 mm"/>
+                                               Text="500 mm Coil → 420 mm Deckbreite · oben 25 mm · unten 30 mm"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -686,16 +687,16 @@
                                 BorderBrush="#E0E6EB"
                                 BorderThickness="1"
                                 CornerRadius="8"
-                                Padding="11"
-                                Margin="0,16,0,0">
+                                Padding="8"
+                                Margin="0,10,0,0">
                             <StackPanel>
                                 <TextBlock Text="3D-Steuerung"
                                            FontSize="11"
                                            FontWeight="SemiBold"
                                            Foreground="#61717D"/>
-                                <TextBlock Margin="0,6,0,0"
-                                           FontSize="10.5"
-                                           LineHeight="17"
+                                <TextBlock Margin="0,4,0,0"
+                                           FontSize="10"
+                                           LineHeight="15"
                                            Foreground="#7D8A94"
                                            TextWrapping="Wrap"
                                            Text="Mausrad: zoomen&#10;Linke Maustaste: rotieren&#10;Rechte Maustaste: verschieben&#10;Kurzer Linksklick: Kante oder Fläche auswählen"/>
