@@ -54,6 +54,7 @@ public partial class MainWindow : Window
 
     private UpdateInfo? _pendingUpdate;
     private bool _updatingCladding;
+    private bool _seamToolActive;
 
     public MainWindow()
     {
@@ -151,10 +152,15 @@ public partial class MainWindow : Window
     private void CladdingTool_Click(object sender, RoutedEventArgs e)
         => ShowCladdingTool();
 
+    private void SeamTool_Click(object sender, RoutedEventArgs e)
+        => ShowSeamTool();
+
     private void ShowDormerTool()
     {
+        _seamToolActive = false;
         DormerPropertiesPanel.Visibility = Visibility.Visible;
         CladdingPropertiesPanel.Visibility = Visibility.Collapsed;
+        SeamPropertiesPanel.Visibility = Visibility.Collapsed;
 
         ToolPanelTitle.Text = "Gaube";
         ToolPanelSubtitle.Text = "Geometrie, Maße und Flächen";
@@ -168,12 +174,21 @@ public partial class MainWindow : Window
             new SolidColorBrush(Color.FromRgb(247, 249, 251));
         CladdingToolButton.BorderBrush =
             new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
+        SeamToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        SeamToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
+        BuildDormer(resetView: false);
     }
 
     private void ShowCladdingTool()
     {
+        _seamToolActive = false;
         DormerPropertiesPanel.Visibility = Visibility.Collapsed;
         CladdingPropertiesPanel.Visibility = Visibility.Visible;
+        SeamPropertiesPanel.Visibility = Visibility.Collapsed;
 
         ToolPanelTitle.Text = "Bekleidung";
         ToolPanelSubtitle.Text = "Material, Deckmaß und Umschläge";
@@ -188,7 +203,43 @@ public partial class MainWindow : Window
         DormerToolButton.BorderBrush =
             new SolidColorBrush(Color.FromRgb(213, 222, 229));
 
+        SeamToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        SeamToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
         RecalculateCladding();
+        BuildDormer(resetView: false);
+    }
+
+    private void ShowSeamTool()
+    {
+        _seamToolActive = true;
+
+        DormerPropertiesPanel.Visibility = Visibility.Collapsed;
+        CladdingPropertiesPanel.Visibility = Visibility.Collapsed;
+        SeamPropertiesPanel.Visibility = Visibility.Visible;
+
+        ToolPanelTitle.Text = "Scharen";
+        ToolPanelSubtitle.Text = "Deckrichtung, Einteilung und erster Zuschnitt";
+
+        SeamToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(231, 241, 247));
+        SeamToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(112, 153, 176));
+
+        DormerToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        DormerToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
+        CladdingToolButton.Background =
+            new SolidColorBrush(Color.FromRgb(247, 249, 251));
+        CladdingToolButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(213, 222, 229));
+
+        UpdateSeamPanel();
+        BuildDormer(resetView: false);
     }
 
     private void CladdingMode_Checked(object sender, RoutedEventArgs e)
@@ -376,6 +427,9 @@ public partial class MainWindow : Window
         {
             _updatingCladding = false;
         }
+
+        if (_seamToolActive)
+            UpdateSeamPanel();
     }
 
     private static double ParseMillimeters(string? text)
@@ -395,6 +449,190 @@ public partial class MainWindow : Window
             out var value)
             ? value
             : 0;
+    }
+
+    private sealed record SeamPan(
+        int Number,
+        double VisibleStartMm,
+        double VisibleEndMm,
+        bool IsStart);
+
+    private double GetRegularDeckWidthMm()
+        => ParseMillimeters(DeckWidthBox?.Text);
+
+    private double GetStartDeckWidthMm()
+    {
+        var coil = ParseMillimeters(CoilWidthBox?.Text);
+        if (coil <= 0)
+            return 0;
+
+        if (ManualProfileRadio?.IsChecked == true)
+        {
+            var underFold = ParseMillimeters(ManualLowerFoldBox?.Text);
+            var correction = ParseSignedMillimeters(ManualDeckCorrectionBox?.Text);
+            return coil - 2.0 * underFold + correction;
+        }
+
+        // Beim aktuellen 25-mm-Maschinenprofil sind ca. 70 mm Falzverlust
+        // hinterlegt. Für die Startschar entspricht das zunächst ebenfalls
+        // ca. 35 mm Unterfalz je Seite.
+        return coil - 70.0;
+    }
+
+    private List<SeamPan> CalculateCheekSeamPans()
+    {
+        var result = new List<SeamPan>();
+        var length = _depthMm;
+        var startWidth = GetStartDeckWidthMm();
+        var regularWidth = GetRegularDeckWidthMm();
+
+        if (length <= 0 || startWidth <= 0 || regularWidth <= 0)
+            return result;
+
+        var cursor = 0.0;
+        var firstEnd = Math.Min(startWidth, length);
+        result.Add(new SeamPan(1, 0, firstEnd, true));
+        cursor = firstEnd;
+
+        var number = 2;
+        while (cursor < length - 0.01)
+        {
+            var next = Math.Min(cursor + regularWidth, length);
+            result.Add(new SeamPan(number++, cursor, next, false));
+            cursor = next;
+        }
+
+        return result;
+    }
+
+    private void UpdateSeamPanel()
+    {
+        if (SeamSurfaceText is null)
+            return;
+
+        var isLeft = _selectedSurfaceKey == "left-cheek";
+        var isRight = _selectedSurfaceKey == "right-cheek";
+
+        if (!isLeft && !isRight)
+        {
+            SeamSurfaceText.Text = "Bitte linke oder rechte Gaubenwange anklicken";
+            SeamDirectionText.Text = "–";
+            PanCountText.Text = "–";
+            LastPanWidthText.Text = "–";
+            StartPanOuterHeightText.Text = "–";
+            StartPanInnerHeightText.Text = "–";
+            return;
+        }
+
+        SeamSurfaceText.Text =
+            isLeft ? "Gaubenwange links" : "Gaubenwange rechts";
+
+        SeamDirectionText.Text =
+            isLeft ? "rechts → links" : "links → rechts";
+
+        var startWidth = GetStartDeckWidthMm();
+        var regularWidth = GetRegularDeckWidthMm();
+        var coil = ParseMillimeters(CoilWidthBox?.Text);
+
+        StartPanWidthText.Text =
+            startWidth > 0 ? $"{startWidth:0.#} mm" : "–";
+        RegularPanWidthText.Text =
+            regularWidth > 0 ? $"{regularWidth:0.#} mm" : "–";
+        StartPanRawWidthText.Text =
+            coil > 0 ? $"{coil:0.#} mm" : "–";
+
+        var pans = CalculateCheekSeamPans();
+        PanCountText.Text =
+            pans.Count > 0 ? pans.Count.ToString(CultureInfo.InvariantCulture) : "–";
+
+        if (pans.Count > 0)
+        {
+            var last = pans[^1];
+            LastPanWidthText.Text =
+                $"{(last.VisibleEndMm - last.VisibleStartMm):0.#} mm";
+
+            var first = pans[0];
+            var raw = CalculateStartPanRawGeometry(first);
+            StartPanOuterHeightText.Text =
+                $"{raw.OuterHeightMm:0.#} mm";
+            StartPanInnerHeightText.Text =
+                $"{raw.InnerHeightMm:0.#} mm";
+        }
+        else
+        {
+            LastPanWidthText.Text = "–";
+            StartPanOuterHeightText.Text = "–";
+            StartPanInnerHeightText.Text = "–";
+        }
+    }
+
+    private (double OuterHeightMm, double InnerHeightMm)
+        CalculateStartPanRawGeometry(SeamPan first)
+    {
+        var topAllowance = Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0);
+        var bottomAllowance = Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0);
+
+        var underFold = ManualProfileRadio?.IsChecked == true
+            ? Math.Max(ParseMillimeters(ManualLowerFoldBox?.Text), 0)
+            : 35.0;
+
+        var rawStart = first.VisibleStartMm - underFold;
+        var rawEnd = first.VisibleEndMm + underFold;
+
+        var topSlope = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+
+        var bottomSlope = Math.Tan(DegToRad(_roofPitchDeg));
+
+        double TopCut(double u) =>
+            _frontWallHeightMm +
+            topSlope * u +
+            topAllowance * Math.Sqrt(1 + topSlope * topSlope);
+
+        double BottomCut(double u) =>
+            bottomSlope * u -
+            bottomAllowance * Math.Sqrt(1 + bottomSlope * bottomSlope);
+
+        var outerHeight = TopCut(rawStart) - BottomCut(rawStart);
+        var innerHeight = TopCut(rawEnd) - BottomCut(rawEnd);
+
+        return (
+            Math.Max(outerHeight, 0),
+            Math.Max(innerHeight, 0));
+    }
+
+    private void AddSelectedCheekSeamLines(
+        Point3D frontBottom,
+        Point3D frontTop,
+        Point3D backPoint)
+    {
+        if (!_seamToolActive)
+            return;
+
+        var pans = CalculateCheekSeamPans();
+        if (pans.Count <= 1 || _depthMm <= 0)
+            return;
+
+        var seamBrush = new SolidColorBrush(Color.FromRgb(48, 104, 132));
+        seamBrush.Freeze();
+
+        foreach (var pan in pans.Take(pans.Count - 1))
+        {
+            var t = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
+
+            var bottom = new Point3D(
+                frontBottom.X + (backPoint.X - frontBottom.X) * t,
+                frontBottom.Y + (backPoint.Y - frontBottom.Y) * t,
+                frontBottom.Z + (backPoint.Z - frontBottom.Z) * t);
+
+            var top = new Point3D(
+                frontTop.X + (backPoint.X - frontTop.X) * t,
+                frontTop.Y + (backPoint.Y - frontTop.Y) * t,
+                frontTop.Z + (backPoint.Z - frontTop.Z) * t);
+
+            AddPassiveEdge(bottom, top, seamBrush, 0.0055);
+        }
     }
 
     private bool HasGable => DormerTypeCombo.SelectedIndex == 1;
@@ -806,6 +1044,12 @@ public partial class MainWindow : Window
         // Deckende Wangen: durch die Gaube darf die Hauptdachfläche nicht sichtbar sein.
         AddTriangleSurface(frontBottomLeft, frontTopLeft, backIntersectionLeft, _dormerSideBrush, "left-cheek");
         AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush, "right-cheek");
+
+        if (_seamToolActive && _selectedSurfaceKey == "left-cheek")
+            AddSelectedCheekSeamLines(frontBottomLeft, frontTopLeft, backIntersectionLeft);
+
+        if (_seamToolActive && _selectedSurfaceKey == "right-cheek")
+            AddSelectedCheekSeamLines(frontBottomRight, frontTopRight, backIntersectionRight);
 
         // Gemeinsame, auswählbare Grundkanten.
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
@@ -1517,6 +1761,12 @@ public partial class MainWindow : Window
         _selectedSurfaceKey = surfaceKey;
         SurfaceDetailPanel.Visibility = Visibility.Visible;
         UpdateSurfaceDetail();
+
+        if (_seamToolActive)
+        {
+            UpdateSeamPanel();
+            BuildDormer(resetView: false);
+        }
     }
 
     private void HideSurfaceDetail()
@@ -1524,6 +1774,12 @@ public partial class MainWindow : Window
         _selectedSurfaceKey = null;
         SurfaceDetailPanel.Visibility = Visibility.Collapsed;
         SurfaceDetailCanvas.Children.Clear();
+
+        if (_seamToolActive)
+        {
+            UpdateSeamPanel();
+            BuildDormer(resetView: false);
+        }
     }
 
     private void UpdateSurfaceDetail()
