@@ -564,26 +564,10 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <RadioButton x:Name="MachineProfileRadio"
+                                        <RadioButton x:Name="ManualProfileRadio"
                                                      Grid.Column="0"
                                                      GroupName="CladdingMode"
                                                      IsChecked="True"
-                                                     Checked="CladdingMode_Checked"
-                                                     VerticalContentAlignment="Center">
-                                            <StackPanel>
-                                                <TextBlock Text="⚙  Maschinell"
-                                                           FontSize="10.5"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="#334753"/>
-                                                <TextBlock Text="Deckmaß automatisch"
-                                                           FontSize="9"
-                                                           Foreground="#87939C"/>
-                                            </StackPanel>
-                                        </RadioButton>
-
-                                        <RadioButton x:Name="ManualProfileRadio"
-                                                     Grid.Column="2"
-                                                     GroupName="CladdingMode"
                                                      Checked="CladdingMode_Checked"
                                                      VerticalContentAlignment="Center">
                                             <StackPanel>
@@ -596,10 +580,26 @@
                                                            Foreground="#87939C"/>
                                             </StackPanel>
                                         </RadioButton>
+
+                                        <RadioButton x:Name="MachineProfileRadio"
+                                                     Grid.Column="2"
+                                                     GroupName="CladdingMode"
+                                                     Checked="CladdingMode_Checked"
+                                                     VerticalContentAlignment="Center">
+                                            <StackPanel>
+                                                <TextBlock Text="⚙  Maschinell"
+                                                           FontSize="10.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#334753"/>
+                                                <TextBlock Text="Deckmaß automatisch"
+                                                           FontSize="9"
+                                                           Foreground="#87939C"/>
+                                            </StackPanel>
+                                        </RadioButton>
                                     </Grid>
 
                                     <TextBlock x:Name="CladdingModeHintText"
-                                               Text="Winkelstehfalz 25 mm · ca. 70 mm Falzverlust"
+                                               Text="Handgekantet · tatsächliche Deckbreite selbst eintragen"
                                                Margin="0,6,0,0"
                                                FontSize="9.5"
                                                Foreground="#7D8992"
@@ -609,7 +609,7 @@
 
                             <Expander x:Name="ManualFoldDetailsExpander"
                                       Header="Falzmaße optional"
-                                      Visibility="Collapsed"
+                                      Visibility="Visible"
                                       IsExpanded="False"
                                       Margin="0,0,0,9"
                                       Foreground="#53636F">
@@ -827,9 +827,9 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox x:Name="DeckWidthBox"
                                                                  Height="32"
-                                                                 Text="430"
-                                                                 IsReadOnly="True"
-                                                                 Background="#F1F4F6"
+                                                                 Text="420"
+                                                                 IsReadOnly="False"
+                                                                 Background="White"
                                                                  TextChanged="CladdingValue_TextChanged"/>
                                                         <TextBlock Grid.Column="1"
                                                                    Text="mm"
@@ -851,7 +851,7 @@
                                                            Foreground="#7D8992"/>
                                                 <TextBlock x:Name="FoldLossText"
                                                            Grid.Column="1"
-                                                           Text="70 mm"
+                                                           Text="80 mm"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Foreground="#31566B"/>
@@ -914,7 +914,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox x:Name="TopAllowanceBox"
                                                              Height="32"
-                                                             Text="25"
+                                                             Text="20"
                                                              TextChanged="CladdingValue_TextChanged"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="mm"
@@ -936,7 +936,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox x:Name="BottomAllowanceBox"
                                                              Height="32"
-                                                             Text="30"
+                                                             Text="20"
                                                              TextChanged="CladdingValue_TextChanged"/>
                                                     <TextBlock Grid.Column="1"
                                                                Text="mm"
@@ -953,7 +953,7 @@
                                                    FontSize="9.5"
                                                    Foreground="#7B8892"
                                                    TextWrapping="Wrap"
-                                                   Text="500 mm Coil · 430 mm Deckbreite · 70 mm Falzverlust"/>
+                                                   Text="500 mm Coil · 420 mm Deckbreite · 80 mm Falzverlust · oben 20 mm · unten 20 mm"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
