@@ -217,7 +217,7 @@
         <Grid Grid.Row="1" Margin="18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="330"/>
+                <ColumnDefinition Width="350"/>
             </Grid.ColumnDefinitions>
 
             <!-- 3D-Viewer -->
@@ -503,183 +503,246 @@
                         <StackPanel x:Name="CladdingPropertiesPanel"
                                     Visibility="Collapsed">
 
-                            <Border Background="#F5F7F9"
+                            <Border Background="#F7F9FB"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="10"
-                                    Margin="0,0,0,10">
-                                <StackPanel>
-                                    <TextBlock Text="MATERIAL / COIL"
-                                               Style="{StaticResource SectionTitle}"/>
+                                    Margin="0,0,0,9">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                    <TextBlock Text="Material"
-                                               Margin="0,7,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <ComboBox x:Name="CladdingMaterialCombo"
-                                              SelectedIndex="0">
-                                        <ComboBoxItem Content="Titanzink"/>
-                                        <ComboBoxItem Content="Aluminium"/>
-                                        <ComboBoxItem Content="Kupfer"/>
-                                        <ComboBoxItem Content="Edelstahl"/>
-                                    </ComboBox>
-
-                                    <TextBlock Text="Zinkcoil-Breite"
-                                               Margin="0,8,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="44"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="CoilWidthBox"
-                                                 Text="500"
-                                                 TextChanged="CladdingValue_TextChanged"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="mm"
-                                                   VerticalAlignment="Center"
+                                    <Border Width="28"
+                                            Height="28"
+                                            CornerRadius="14"
+                                            Background="#E7F0F5"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="◉"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="#6E7A86"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Background="#F8FAFB"
-                                    BorderBrush="#DDE4E9"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    Padding="10"
-                                    Margin="0,0,0,10">
-                                <StackPanel>
-                                    <TextBlock Text="FALZ / DECKBREITE"
-                                               Style="{StaticResource SectionTitle}"/>
-
-                                    <TextBlock Text="Überdeck"
-                                               Margin="0,7,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="44"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="OverlapBox"
-                                                 Text="45"
-                                                 TextChanged="CladdingValue_TextChanged"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="mm"
                                                    VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="#6E7A86"/>
-                                    </Grid>
-
-                                    <TextBlock Text="Unterdeck"
-                                               Margin="0,7,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="44"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="UnderlapBox"
-                                                 Text="35"
-                                                 TextChanged="CladdingValue_TextChanged"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="mm"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="#6E7A86"/>
-                                    </Grid>
-
-                                    <Border Background="#EEF4F7"
-                                            BorderBrush="#D1DDE4"
-                                            BorderThickness="1"
-                                            CornerRadius="7"
-                                            Padding="8"
-                                            Margin="0,8,0,0">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="Deckbreite einer Schar"
-                                                           FontSize="11"
-                                                           Foreground="#61717D"/>
-                                                <TextBlock Text="Coil − Überdeck − Unterdeck"
-                                                           Margin="0,2,0,0"
-                                                           FontSize="9.5"
-                                                           Foreground="#8A969F"/>
-                                            </StackPanel>
-                                            <TextBlock x:Name="DeckWidthText"
-                                                       Grid.Column="1"
-                                                       Text="420 mm"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="17"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#1E536B"/>
-                                        </Grid>
+                                                   FontSize="14"
+                                                   Foreground="#31566B"/>
                                     </Border>
+
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Material"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#53636F"/>
+                                        <ComboBox x:Name="CladdingMaterialCombo"
+                                                  Height="32"
+                                                  Margin="0,4,0,0"
+                                                  SelectedIndex="0">
+                                            <ComboBoxItem Content="Titanzink"/>
+                                            <ComboBoxItem Content="Aluminium"/>
+                                            <ComboBoxItem Content="Kupfer"/>
+                                            <ComboBoxItem Content="Edelstahl"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Background="#F7F9FB"
+                                    BorderBrush="#DDE4E9"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,9">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="28"
+                                                Height="28"
+                                                CornerRadius="14"
+                                                Background="#E7F0F5"
+                                                VerticalAlignment="Top">
+                                            <TextBlock Text="↔"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="15"
+                                                       Foreground="#31566B"/>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Band &amp; Deckmaß"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#53636F"/>
+
+                                            <Grid Margin="0,5,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="10"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Coilbreite"
+                                                               FontSize="9.5"
+                                                               Foreground="#7D8992"/>
+                                                    <Grid Margin="0,2,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="32"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="CoilWidthBox"
+                                                                 Height="32"
+                                                                 Text="500"
+                                                                 TextChanged="CladdingValue_TextChanged"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="mm"
+                                                                   VerticalAlignment="Center"
+                                                                   HorizontalAlignment="Center"
+                                                                   FontSize="10"
+                                                                   Foreground="#6E7A86"/>
+                                                    </Grid>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Deckbreite"
+                                                               FontSize="9.5"
+                                                               Foreground="#7D8992"/>
+                                                    <Grid Margin="0,2,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="32"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="DeckWidthBox"
+                                                                 Height="32"
+                                                                 Text="430"
+                                                                 TextChanged="CladdingValue_TextChanged"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="mm"
+                                                                   VerticalAlignment="Center"
+                                                                   HorizontalAlignment="Center"
+                                                                   FontSize="10"
+                                                                   Foreground="#6E7A86"/>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,7,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Falzverlust"
+                                                           FontSize="10"
+                                                           Foreground="#7D8992"/>
+                                                <TextBlock x:Name="FoldLossText"
+                                                           Grid.Column="1"
+                                                           Text="70 mm"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#31566B"/>
+                                            </Grid>
+
+                                            <TextBlock Text="Standard: Winkelstehfalz 25 mm · Profiliermaschine"
+                                                       Margin="0,3,0,0"
+                                                       FontSize="9.5"
+                                                       Foreground="#8A969F"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <Border Background="#F8FAFB"
+                            <Border Background="#F7F9FB"
                                     BorderBrush="#DDE4E9"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="10">
-                                <StackPanel>
-                                    <TextBlock Text="ZUGABEN / UMSCHLÄGE"
-                                               Style="{StaticResource SectionTitle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                    <TextBlock Text="Zugabe oben"
-                                               Margin="0,7,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="44"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="TopAllowanceBox"
-                                                 Text="25"
-                                                 TextChanged="CladdingValue_TextChanged"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="mm"
-                                                   VerticalAlignment="Center"
+                                    <Border Width="28"
+                                            Height="28"
+                                            CornerRadius="14"
+                                            Background="#E7F0F5"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="↕"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="#6E7A86"/>
-                                    </Grid>
-
-                                    <TextBlock Text="Zugabe unten"
-                                               Margin="0,7,0,3"
-                                               FontSize="11"
-                                               Foreground="#5D6B76"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="44"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="BottomAllowanceBox"
-                                                 Text="30"
-                                                 TextChanged="CladdingValue_TextChanged"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="mm"
                                                    VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="#6E7A86"/>
-                                    </Grid>
+                                                   FontSize="15"
+                                                   Foreground="#31566B"/>
+                                    </Border>
 
-                                    <TextBlock x:Name="CladdingSummaryText"
-                                               Margin="0,8,0,0"
-                                               FontSize="10"
-                                               Foreground="#7B8892"
-                                               TextWrapping="Wrap"
-                                               Text="500 mm Coil → 420 mm Deckbreite · oben 25 mm · unten 30 mm"/>
-                                </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Umschläge / Zugaben"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#53636F"/>
+
+                                        <Grid Margin="0,5,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="oben"
+                                                           FontSize="9.5"
+                                                           Foreground="#7D8992"/>
+                                                <Grid Margin="0,2,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="32"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TopAllowanceBox"
+                                                             Height="32"
+                                                             Text="25"
+                                                             TextChanged="CladdingValue_TextChanged"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="mm"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               FontSize="10"
+                                                               Foreground="#6E7A86"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="unten"
+                                                           FontSize="9.5"
+                                                           Foreground="#7D8992"/>
+                                                <Grid Margin="0,2,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="32"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="BottomAllowanceBox"
+                                                             Height="32"
+                                                             Text="30"
+                                                             TextChanged="CladdingValue_TextChanged"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="mm"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               FontSize="10"
+                                                               Foreground="#6E7A86"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock x:Name="CladdingSummaryText"
+                                                   Margin="0,7,0,0"
+                                                   FontSize="9.5"
+                                                   Foreground="#7B8892"
+                                                   TextWrapping="Wrap"
+                                                   Text="500 mm Coil · 430 mm Deckbreite · 70 mm Falzverlust"/>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
                         </StackPanel>
 
