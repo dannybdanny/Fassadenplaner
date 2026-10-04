@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private readonly List<(Point3D Start, Point3D End, string Key)> _dimensionHitSegments = new();
     private readonly Dictionary<GeometryModel3D, string> _surfaceKeys = new();
     private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
+    private readonly Dictionary<GeometryModel3D, int> _seamPanModels = new();
 
     private string? _selectedSurfaceKey;
 
@@ -56,6 +57,8 @@ public partial class MainWindow : Window
     private bool _updatingCladding;
     private bool _seamToolActive;
     private int? _selectedSeamPanNumber;
+    private int? _lastClickedSeamPanNumber;
+    private DateTime _lastSeamPanClickUtc = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -726,63 +729,29 @@ public partial class MainWindow : Window
 
     private int? HitTestSeamPan(Point clickPoint)
     {
-        if (!_seamToolActive ||
-            _selectedSurfaceKey is not ("left-cheek" or "right-cheek"))
-        {
-            return null;
-        }
-
-        var pans = CalculateCheekSeamPans();
-        if (pans.Count == 0 || _depthMm <= 0)
+        if (!_seamToolActive || _seamPanModels.Count == 0)
             return null;
 
-        var isLeft = _selectedSurfaceKey == "left-cheek";
-        var scale = ComputeScale();
-        var width = _widthMm * scale;
-        var height = _frontWallHeightMm * scale;
-        var depth = _depthMm * scale;
+        int? panNumber = null;
 
-        var x = isLeft ? -width / 2.0 : width / 2.0;
-        var zFront = depth / 2.0;
-        var zBack = -depth / 2.0;
-
-        var frontBottom = new Point3D(x, 0, zFront);
-        var frontTop = new Point3D(x, height, zFront);
-
-        var dormerPitchTan = HasShedRoof
-            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
-            : 0.0;
-
-        var backY = height + dormerPitchTan * depth;
-        var back = new Point3D(x, backY, zBack);
-
-        foreach (var pan in pans)
-        {
-            var t0 = Math.Clamp(pan.VisibleStartMm / _depthMm, 0, 1);
-            var t1 = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
-
-            var b0 = Lerp(frontBottom, back, t0);
-            var t0p = Lerp(frontTop, back, t0);
-            var b1 = Lerp(frontBottom, back, t1);
-            var t1p = Lerp(frontTop, back, t1);
-
-            var p0 = ProjectToViewport(b0);
-            var p1 = ProjectToViewport(b1);
-            var p2 = ProjectToViewport(t1p);
-            var p3 = ProjectToViewport(t0p);
-
-            if (p0 is null || p1 is null || p2 is null || p3 is null)
-                continue;
-
-            if (PointInPolygon(
-                clickPoint,
-                new[] { p0.Value, p1.Value, p2.Value, p3.Value }))
+        VisualTreeHelper.HitTest(
+            DormerViewport,
+            null,
+            result =>
             {
-                return pan.Number;
-            }
-        }
+                if (result is RayMeshGeometry3DHitTestResult ray &&
+                    ray.ModelHit is GeometryModel3D model &&
+                    _seamPanModels.TryGetValue(model, out var found))
+                {
+                    panNumber = found;
+                    return HitTestResultBehavior.Stop;
+                }
 
-        return null;
+                return HitTestResultBehavior.Continue;
+            },
+            new PointHitTestParameters(clickPoint));
+
+        return panNumber;
     }
 
     private static Point3D Lerp(Point3D a, Point3D b, double t)
@@ -844,6 +813,73 @@ public partial class MainWindow : Window
                 frontTop.Z + (backPoint.Z - frontTop.Z) * t);
 
             AddPassiveEdge(bottom, top, seamBrush, 0.0055);
+        }
+    }
+
+    private void AddInteractiveSeamPanSurfaces(
+        Point3D frontBottom,
+        Point3D frontTop,
+        Point3D backPoint,
+        bool isLeft)
+    {
+        if (!_seamToolActive)
+            return;
+
+        var pans = CalculateCheekSeamPans();
+        if (pans.Count == 0 || _depthMm <= 0)
+            return;
+
+        var offset = isLeft ? -0.010 : 0.010;
+
+        foreach (var pan in pans)
+        {
+            var t0 = Math.Clamp(pan.VisibleStartMm / _depthMm, 0, 1);
+            var t1 = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
+
+            var b0 = Lerp(frontBottom, backPoint, t0);
+            var top0 = Lerp(frontTop, backPoint, t0);
+            var b1 = Lerp(frontBottom, backPoint, t1);
+            var top1 = Lerp(frontTop, backPoint, t1);
+
+            b0.X += offset;
+            top0.X += offset;
+            b1.X += offset;
+            top1.X += offset;
+
+            var mesh = new MeshGeometry3D();
+
+            mesh.Positions.Add(b0);
+            mesh.Positions.Add(b1);
+            mesh.Positions.Add(top1);
+            mesh.Positions.Add(top0);
+
+            mesh.TriangleIndices.Add(0);
+            mesh.TriangleIndices.Add(1);
+            mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(0);
+            mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(3);
+
+            var selected = _selectedSeamPanNumber == pan.Number;
+
+            var brush = new SolidColorBrush(
+                selected
+                    ? Color.FromArgb(115, 67, 142, 181)
+                    : Color.FromArgb(18, 67, 142, 181));
+            brush.Freeze();
+
+            var material = new DiffuseMaterial(brush);
+            var model = new GeometryModel3D(mesh, material)
+            {
+                BackMaterial = material
+            };
+
+            _seamPanModels[model] = pan.Number;
+
+            DormerViewport.Children.Add(new ModelVisual3D
+            {
+                Content = model
+            });
         }
     }
 
@@ -1252,6 +1288,7 @@ public partial class MainWindow : Window
         _dimensionHitSegments.Clear();
         _surfaceKeys.Clear();
         _dimensionAnchors.Clear();
+        _seamPanModels.Clear();
 
         var lights = new Model3DGroup();
         lights.Children.Add(new AmbientLight(Color.FromRgb(245, 245, 245)));
@@ -1294,7 +1331,7 @@ public partial class MainWindow : Window
         if (_seamToolActive && _selectedSurfaceKey == "left-cheek")
         {
             AddSelectedCheekSeamLines(frontBottomLeft, frontTopLeft, backIntersectionLeft);
-            AddSelectedSeamPanHighlight(
+            AddInteractiveSeamPanSurfaces(
                 frontBottomLeft,
                 frontTopLeft,
                 backIntersectionLeft,
@@ -1304,7 +1341,7 @@ public partial class MainWindow : Window
         if (_seamToolActive && _selectedSurfaceKey == "right-cheek")
         {
             AddSelectedCheekSeamLines(frontBottomRight, frontTopRight, backIntersectionRight);
-            AddSelectedSeamPanHighlight(
+            AddInteractiveSeamPanSurfaces(
                 frontBottomRight,
                 frontTopRight,
                 backIntersectionRight,
@@ -1499,10 +1536,22 @@ public partial class MainWindow : Window
 
                 if (panNumber is not null)
                 {
+                    var now = DateTime.UtcNow;
+                    var isDoubleClick =
+                        _lastClickedSeamPanNumber == panNumber.Value &&
+                        (now - _lastSeamPanClickUtc).TotalMilliseconds <= 500;
+
                     SelectSeamPan(panNumber.Value);
 
-                    if (e.ClickCount >= 2)
+                    _lastClickedSeamPanNumber = panNumber.Value;
+                    _lastSeamPanClickUtc = now;
+
+                    if (isDoubleClick)
+                    {
+                        _lastClickedSeamPanNumber = null;
+                        _lastSeamPanClickUtc = DateTime.MinValue;
                         OpenSelectedSeamCutWindow();
+                    }
 
                     _isOrbiting = false;
 
@@ -2047,7 +2096,11 @@ public partial class MainWindow : Window
         if (_seamToolActive)
         {
             if (surfaceKey is "left-cheek" or "right-cheek")
+            {
                 _selectedSeamPanNumber = 1;
+                _lastClickedSeamPanNumber = null;
+                _lastSeamPanClickUtc = DateTime.MinValue;
+            }
 
             UpdateSeamPanel();
             BuildDormer(resetView: false);
