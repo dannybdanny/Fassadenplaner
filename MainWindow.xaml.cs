@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private readonly Dictionary<GeometryModel3D, string> _surfaceKeys = new();
     private readonly Dictionary<string, Point3D> _dimensionAnchors = new();
     private readonly Dictionary<GeometryModel3D, int> _seamPanModels = new();
+    private readonly Dictionary<int, Point3D> _seamPanLabelAnchors = new();
+    private string _seamPanLabelPrefix = string.Empty;
 
     private string? _selectedSurfaceKey;
 
@@ -1243,6 +1245,15 @@ public partial class MainWindow : Window
 
             _seamPanModels[model] = pan.Number;
 
+            _seamPanLabelPrefix = isLeft ? "WL" : "WR";
+
+            // Beschriftung immer mittig auf der sichtbaren Schar.
+            var labelBottom = Lerp(b0, b1, 0.5);
+            var labelTop = Lerp(top0, top1, 0.5);
+            var labelAnchor = Lerp(labelBottom, labelTop, 0.5);
+
+            _seamPanLabelAnchors[pan.Number] = labelAnchor;
+
             DormerViewport.Children.Add(new ModelVisual3D
             {
                 Content = model
@@ -1656,6 +1667,8 @@ public partial class MainWindow : Window
         _surfaceKeys.Clear();
         _dimensionAnchors.Clear();
         _seamPanModels.Clear();
+        _seamPanLabelAnchors.Clear();
+        _seamPanLabelPrefix = string.Empty;
 
         var lights = new Model3DGroup();
         lights.Children.Add(new AmbientLight(Color.FromRgb(245, 245, 245)));
@@ -2885,6 +2898,64 @@ public partial class MainWindow : Window
             Canvas.SetTop(button, projected.Value.Y - button.DesiredSize.Height / 2 - 5);
 
             DimensionOverlay.Children.Add(button);
+        }
+
+        AddSeamPanNumberLabelsToOverlay();
+    }
+
+    private void AddSeamPanNumberLabelsToOverlay()
+    {
+        if (!_seamToolActive ||
+            string.IsNullOrWhiteSpace(_seamPanLabelPrefix) ||
+            _seamPanLabelAnchors.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var pair in _seamPanLabelAnchors.OrderBy(p => p.Key))
+        {
+            var projected = ProjectToOverlay(pair.Value);
+            if (projected is null)
+                continue;
+
+            var selected = _selectedSeamPanNumber == pair.Key;
+
+            var label = new Border
+            {
+                IsHitTestVisible = false,
+                Background = new SolidColorBrush(
+                    selected
+                        ? Color.FromArgb(230, 232, 244, 251)
+                        : Color.FromArgb(205, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(
+                    selected
+                        ? Color.FromRgb(63, 129, 165)
+                        : Color.FromRgb(185, 196, 204)),
+                BorderThickness = new Thickness(selected ? 1.2 : 0.8),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(4, 1, 4, 1),
+                Child = new TextBlock
+                {
+                    Text = $"{_seamPanLabelPrefix} {pair.Key}",
+                    FontSize = 9.5,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(45, 66, 80))
+                }
+            };
+
+            label.Measure(
+                new Size(
+                    double.PositiveInfinity,
+                    double.PositiveInfinity));
+
+            var left =
+                projected.Value.X - label.DesiredSize.Width / 2.0;
+            var top =
+                projected.Value.Y - label.DesiredSize.Height / 2.0;
+
+            Canvas.SetLeft(label, left);
+            Canvas.SetTop(label, top);
+            DimensionOverlay.Children.Add(label);
         }
     }
 
