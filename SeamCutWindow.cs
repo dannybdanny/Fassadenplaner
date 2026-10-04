@@ -8,6 +8,8 @@ using System.Windows.Shapes;
 namespace Fassadenplaner;
 
 public sealed record SeamCutData(
+    string SurfaceKey,
+    string PanCode,
     string SurfaceName,
     int PanNumber,
     bool IsStartPan,
@@ -23,7 +25,10 @@ public sealed record SeamCutData(
     double BottomAllowanceMm,
     string StartFoldName,
     string EndFoldName,
-    string DeckDirection);
+    string DeckDirection,
+    double? TopApexOffsetMm = null,
+    double? TopApexHeightMm = null,
+    bool ShowTopAngle = false);
 
 public sealed class SeamCutWindow : Window
 {
@@ -49,10 +54,12 @@ public sealed class SeamCutWindow : Window
     // hohe Startseite rechts, Deckrichtung rechts → links.
     // Rechte Wange: hohe Startseite links, Deckrichtung links → rechts.
     private bool IsLeftCheek =>
-        _data.SurfaceName.Contains("links", StringComparison.OrdinalIgnoreCase);
+        _data.SurfaceKey == "left-cheek";
 
-    private string PanCode =>
-        $"{(IsLeftCheek ? "WL" : "WR")} {_data.PanNumber}";
+    private bool IsFront =>
+        _data.SurfaceKey == "front";
+
+    private string PanCode => _data.PanCode;
 
     private static readonly CultureInfo GermanCulture =
         CultureInfo.GetCultureInfo("de-DE");
@@ -143,9 +150,11 @@ public sealed class SeamCutWindow : Window
 
         left.Children.Add(new TextBlock
         {
-            Text = _data.IsStartPan
-                ? "Startschar · Unterfalz auf beiden Seiten"
-                : $"{_data.StartFoldName} Startseite · {_data.EndFoldName} Endseite",
+            Text = IsFront
+                ? $"{_data.StartFoldName} links · {_data.EndFoldName} rechts"
+                : _data.IsStartPan
+                    ? "Startschar · Unterfalz auf beiden Seiten"
+                    : $"{_data.StartFoldName} Startseite · {_data.EndFoldName} Endseite",
             Margin = new Thickness(0, 2, 0, 0),
             FontSize = 10,
             Foreground = new SolidColorBrush(Color.FromRgb(112, 128, 139))
@@ -348,7 +357,10 @@ public sealed class SeamCutWindow : Window
         var availableHeight = Math.Max(100, height - marginTop - marginBottom);
 
         var rawWidth = Math.Max(_data.RawWidthMm, 1);
-        var maxHeight = Math.Max(_data.StartHeightMm, _data.EndHeightMm);
+        var maxHeight = Math.Max(
+            Math.Max(_data.StartHeightMm, _data.EndHeightMm),
+            _data.TopApexHeightMm ?? 0);
+
         var contentHeightMm = Math.Max(
             maxHeight + Math.Abs(_data.BottomDeltaMm),
             1);
@@ -384,6 +396,16 @@ public sealed class SeamCutWindow : Window
         var pBottomRight = new Point(x1, rightBottom);
         var pTopRight = new Point(x1, rightTop);
         var pTopLeft = new Point(x0, leftTop);
+
+        Point? pTopApex = null;
+
+        if (_data.TopApexOffsetMm is double apexOffset &&
+            _data.TopApexHeightMm is double apexHeight)
+        {
+            pTopApex = new Point(
+                x0 + apexOffset * scale,
+                bottomBase - apexHeight * scale);
+        }
 
         var startFoldX = IsLeftCheek
             ? x1 - _data.StartFoldMm * scale
@@ -433,15 +455,21 @@ public sealed class SeamCutWindow : Window
             new Point(x1, rightTop),
             new Point(x1, rightBottom));
 
+        var polygonPoints = new PointCollection
+        {
+            pBottomLeft,
+            pBottomRight,
+            pTopRight
+        };
+
+        if (pTopApex is Point apexPoint)
+            polygonPoints.Add(apexPoint);
+
+        polygonPoints.Add(pTopLeft);
+
         var polygon = new Polygon
         {
-            Points = new PointCollection
-            {
-                pBottomLeft,
-                pBottomRight,
-                pTopRight,
-                pTopLeft
-            },
+            Points = polygonPoints,
             Fill = new SolidColorBrush(Color.FromArgb(195, 231, 236, 240)),
             Stroke = new SolidColorBrush(Color.FromRgb(45, 61, 72)),
             StrokeThickness = 1.6
@@ -449,20 +477,38 @@ public sealed class SeamCutWindow : Window
 
         _drawingCanvas.Children.Add(polygon);
 
-        DrawPanCodeLabel(
-            pBottomLeft,
-            pBottomRight,
-            pTopRight,
-            pTopLeft);
+        DrawPanCodeLabel(polygonPoints);
 
         DrawFoldLine(leftFoldX, leftBottom, leftTop);
         DrawFoldLine(rightFoldX, rightBottom, rightTop);
 
-        DrawAllowanceLine(
-            pTopLeft,
-            pTopRight,
-            new Point((x0 + x1) / 2, (leftBottom + rightBottom) / 2),
-            _data.TopAllowanceMm * scale);
+        var interiorPoint =
+            new Point(
+                (x0 + x1) / 2,
+                (leftBottom + rightBottom) / 2);
+
+        if (pTopApex is Point topApex)
+        {
+            DrawAllowanceLine(
+                pTopLeft,
+                topApex,
+                interiorPoint,
+                _data.TopAllowanceMm * scale);
+
+            DrawAllowanceLine(
+                topApex,
+                pTopRight,
+                interiorPoint,
+                _data.TopAllowanceMm * scale);
+        }
+        else
+        {
+            DrawAllowanceLine(
+                pTopLeft,
+                pTopRight,
+                interiorPoint,
+                _data.TopAllowanceMm * scale);
+        }
 
         DrawAllowanceLine(
             pBottomLeft,
@@ -524,21 +570,37 @@ public sealed class SeamCutWindow : Window
             rightTop,
             FormatLength(rightHeightMm));
 
+        if (_data.ShowTopAngle)
+        {
+            if (pTopApex is Point topApex)
+            {
+                var leftLength = (topApex - pTopLeft).Length;
+                var rightLength = (pTopRight - topApex).Length;
+
+                if (leftLength >= rightLength)
+                    DrawTopAngle(pTopLeft, topApex);
+                else
+                    DrawTopAngle(topApex, pTopRight);
+            }
+            else
+            {
+                DrawTopAngle(pTopLeft, pTopRight);
+            }
+        }
+
         DrawBottomAngle(
             pBottomLeft,
             pBottomRight);
     }
 
-    private void DrawPanCodeLabel(
-        Point bottomLeft,
-        Point bottomRight,
-        Point topRight,
-        Point topLeft)
+    private void DrawPanCodeLabel(PointCollection polygonPoints)
     {
-        // Geometrischer Mittelpunkt der sichtbaren Schar.
+        if (polygonPoints.Count == 0)
+            return;
+
         var center = new Point(
-            (bottomLeft.X + bottomRight.X + topRight.X + topLeft.X) / 4.0,
-            (bottomLeft.Y + bottomRight.Y + topRight.Y + topLeft.Y) / 4.0);
+            polygonPoints.Average(p => p.X),
+            polygonPoints.Average(p => p.Y));
 
         var label = new Border
         {
@@ -573,6 +635,35 @@ public sealed class SeamCutWindow : Window
             center.Y - label.DesiredSize.Height / 2.0);
 
         _drawingCanvas.Children.Add(label);
+    }
+
+    private void DrawTopAngle(
+        Point left,
+        Point right)
+    {
+        var dx = right.X - left.X;
+        var dy = right.Y - left.Y;
+
+        if (Math.Abs(dx) < 0.001)
+            return;
+
+        var angleDeg =
+            Math.Atan2(Math.Abs(dy), Math.Abs(dx)) *
+            180.0 / Math.PI;
+
+        if (angleDeg < 0.05)
+            return;
+
+        var interiorDeg =
+            Math.Max(0, 90.0 - angleDeg);
+
+        var mid = new Point(
+            (left.X + right.X) / 2.0,
+            (left.Y + right.Y) / 2.0);
+
+        AddAngleLabel(
+            $"oben {angleDeg.ToString("0.#", GermanCulture)}° · Innen {interiorDeg.ToString("0.#", GermanCulture)}°",
+            new Point(mid.X, mid.Y + 16));
     }
 
     private void DrawBottomAngle(
