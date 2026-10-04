@@ -51,6 +51,9 @@ public sealed class SeamCutWindow : Window
     private bool IsLeftCheek =>
         _data.SurfaceName.Contains("links", StringComparison.OrdinalIgnoreCase);
 
+    private string PanCode =>
+        $"{(IsLeftCheek ? "WL" : "WR")} {_data.PanNumber}";
+
     private static readonly CultureInfo GermanCulture =
         CultureInfo.GetCultureInfo("de-DE");
 
@@ -132,7 +135,7 @@ public sealed class SeamCutWindow : Window
 
         left.Children.Add(new TextBlock
         {
-            Text = $"{_data.SurfaceName} · Schar {_data.PanNumber}",
+            Text = $"{_data.SurfaceName} · {PanCode}",
             FontSize = 18,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(29, 43, 54))
@@ -446,6 +449,12 @@ public sealed class SeamCutWindow : Window
 
         _drawingCanvas.Children.Add(polygon);
 
+        DrawPanCodeLabel(
+            pBottomLeft,
+            pBottomRight,
+            pTopRight,
+            pTopLeft);
+
         DrawFoldLine(leftFoldX, leftBottom, leftTop);
         DrawFoldLine(rightFoldX, rightBottom, rightTop);
 
@@ -518,6 +527,52 @@ public sealed class SeamCutWindow : Window
         DrawBottomAngle(
             pBottomLeft,
             pBottomRight);
+    }
+
+    private void DrawPanCodeLabel(
+        Point bottomLeft,
+        Point bottomRight,
+        Point topRight,
+        Point topLeft)
+    {
+        // Geometrischer Mittelpunkt der sichtbaren Schar.
+        var center = new Point(
+            (bottomLeft.X + bottomRight.X + topRight.X + topLeft.X) / 4.0,
+            (bottomLeft.Y + bottomRight.Y + topRight.Y + topLeft.Y) / 4.0);
+
+        var label = new Border
+        {
+            Background =
+                new SolidColorBrush(Color.FromArgb(215, 255, 255, 255)),
+            BorderBrush =
+                new SolidColorBrush(Color.FromRgb(181, 193, 201)),
+            BorderThickness = new Thickness(0.8),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(5, 2, 5, 2),
+            Child = new TextBlock
+            {
+                Text = PanCode,
+                FontSize = 10.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground =
+                    new SolidColorBrush(Color.FromRgb(45, 66, 80))
+            }
+        };
+
+        label.Measure(
+            new Size(
+                double.PositiveInfinity,
+                double.PositiveInfinity));
+
+        Canvas.SetLeft(
+            label,
+            center.X - label.DesiredSize.Width / 2.0);
+
+        Canvas.SetTop(
+            label,
+            center.Y - label.DesiredSize.Height / 2.0);
+
+        _drawingCanvas.Children.Add(label);
     }
 
     private void DrawBottomAngle(
