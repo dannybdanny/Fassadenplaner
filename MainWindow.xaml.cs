@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     private UpdateInfo? _pendingUpdate;
     private bool _updatingCladding;
     private bool _seamToolActive;
+    private int? _selectedSeamPanNumber;
 
     public MainWindow()
     {
@@ -158,6 +159,7 @@ public partial class MainWindow : Window
     private void ShowDormerTool()
     {
         _seamToolActive = false;
+        _selectedSeamPanNumber = null;
         DormerPropertiesPanel.Visibility = Visibility.Visible;
         CladdingPropertiesPanel.Visibility = Visibility.Collapsed;
         SeamPropertiesPanel.Visibility = Visibility.Collapsed;
@@ -186,6 +188,7 @@ public partial class MainWindow : Window
     private void ShowCladdingTool()
     {
         _seamToolActive = false;
+        _selectedSeamPanNumber = null;
         DormerPropertiesPanel.Visibility = Visibility.Collapsed;
         CladdingPropertiesPanel.Visibility = Visibility.Visible;
         SeamPropertiesPanel.Visibility = Visibility.Collapsed;
@@ -538,6 +541,10 @@ public partial class MainWindow : Window
             SeamDirectionText.Text = "–";
             PanCountText.Text = "–";
             LastPanWidthText.Text = "–";
+            _selectedSeamPanNumber = null;
+            SelectedPanCutTitle.Text = "Zuschnitt";
+            SelectedPanCutSubtitle.Text = "Schar anklicken · Doppelklick öffnet 2D";
+            StartPanRawWidthText.Text = "–";
             StartPanOuterHeightText.Text = "–";
             StartPanInnerHeightText.Text = "–";
             return;
@@ -557,9 +564,6 @@ public partial class MainWindow : Window
             startWidth > 0 ? $"{startWidth:0.#} mm" : "–";
         RegularPanWidthText.Text =
             regularWidth > 0 ? $"{regularWidth:0.#} mm" : "–";
-        StartPanRawWidthText.Text =
-            coil > 0 ? $"{coil:0.#} mm" : "–";
-
         var pans = CalculateCheekSeamPans();
         PanCountText.Text =
             pans.Count > 0 ? pans.Count.ToString(CultureInfo.InvariantCulture) : "–";
@@ -570,12 +574,25 @@ public partial class MainWindow : Window
             LastPanWidthText.Text =
                 $"{(last.VisibleEndMm - last.VisibleStartMm):0.#} mm";
 
-            var first = pans[0];
-            var raw = CalculateStartPanRawGeometry(first);
+            var selected = GetSelectedSeamPan() ?? pans[0];
+
+            if (_selectedSeamPanNumber is null)
+                _selectedSeamPanNumber = selected.Number;
+
+            var raw = CalculatePanRawGeometry(selected);
+
+            SelectedPanCutTitle.Text =
+                $"Zuschnitt · Schar {selected.Number}";
+            SelectedPanCutSubtitle.Text = selected.IsStart
+                ? "Startschar · Unterfalz auf beiden Seiten · Doppelklick öffnet 2D"
+                : "Oberfalz an der Startseite · Unterfalz an der Endseite · Doppelklick öffnet 2D";
+
+            StartPanRawWidthText.Text =
+                $"{raw.RawWidthMm:0.#} mm";
             StartPanOuterHeightText.Text =
-                $"{raw.OuterHeightMm:0.#} mm";
+                $"{raw.StartHeightMm:0.#} mm";
             StartPanInnerHeightText.Text =
-                $"{raw.InnerHeightMm:0.#} mm";
+                $"{raw.EndHeightMm:0.#} mm";
         }
         else
         {
@@ -585,8 +602,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private (double OuterHeightMm, double InnerHeightMm)
-        CalculateStartPanRawGeometry(SeamPan first)
+    private sealed record PanRawGeometry(
+        double RawWidthMm,
+        double StartHeightMm,
+        double EndHeightMm,
+        double BottomDeltaMm,
+        double TopDeltaMm,
+        double StartFoldMm,
+        double EndFoldMm,
+        string StartFoldName,
+        string EndFoldName);
+
+    private PanRawGeometry CalculatePanRawGeometry(SeamPan pan)
     {
         var topAllowance = Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0);
         var bottomAllowance = Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0);
@@ -595,8 +622,15 @@ public partial class MainWindow : Window
             ? Math.Max(ParseMillimeters(ManualLowerFoldBox?.Text), 0)
             : 35.0;
 
-        var rawStart = first.VisibleStartMm - underFold;
-        var rawEnd = first.VisibleEndMm + underFold;
+        var overFold = ManualProfileRadio?.IsChecked == true
+            ? Math.Max(ParseMillimeters(ManualUpperFoldBox?.Text), 0)
+            : 35.0;
+
+        var startFold = pan.IsStart ? underFold : overFold;
+        var endFold = underFold;
+
+        var rawStart = pan.VisibleStartMm - startFold;
+        var rawEnd = pan.VisibleEndMm + endFold;
 
         var topSlope = HasShedRoof
             ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
@@ -604,21 +638,180 @@ public partial class MainWindow : Window
 
         var bottomSlope = Math.Tan(DegToRad(_roofPitchDeg));
 
-        double TopCut(double u) =>
-            _frontWallHeightMm +
-            topSlope * u +
-            topAllowance * Math.Sqrt(1 + topSlope * topSlope);
+        double TopLine(double u) =>
+            _frontWallHeightMm + topSlope * u;
 
-        double BottomCut(double u) =>
-            bottomSlope * u -
-            bottomAllowance * Math.Sqrt(1 + bottomSlope * bottomSlope);
+        double BottomLine(double u) =>
+            bottomSlope * u;
 
-        var outerHeight = TopCut(rawStart) - BottomCut(rawStart);
-        var innerHeight = TopCut(rawEnd) - BottomCut(rawEnd);
+        var topOffset = topAllowance * Math.Sqrt(1 + topSlope * topSlope);
+        var bottomOffset = bottomAllowance * Math.Sqrt(1 + bottomSlope * bottomSlope);
 
-        return (
-            Math.Max(outerHeight, 0),
-            Math.Max(innerHeight, 0));
+        double TopCut(double u) => TopLine(u) + topOffset;
+        double BottomCut(double u) => BottomLine(u) - bottomOffset;
+
+        var startTop = TopCut(rawStart);
+        var startBottom = BottomCut(rawStart);
+        var endTop = TopCut(rawEnd);
+        var endBottom = BottomCut(rawEnd);
+
+        return new PanRawGeometry(
+            RawWidthMm: Math.Max(rawEnd - rawStart, 0),
+            StartHeightMm: Math.Max(startTop - startBottom, 0),
+            EndHeightMm: Math.Max(endTop - endBottom, 0),
+            BottomDeltaMm: endBottom - startBottom,
+            TopDeltaMm: endTop - startTop,
+            StartFoldMm: startFold,
+            EndFoldMm: endFold,
+            StartFoldName: pan.IsStart ? "Unterfalz" : "Oberfalz",
+            EndFoldName: "Unterfalz");
+    }
+
+    private SeamPan? GetSelectedSeamPan()
+    {
+        if (_selectedSeamPanNumber is null)
+            return null;
+
+        return CalculateCheekSeamPans()
+            .FirstOrDefault(p => p.Number == _selectedSeamPanNumber.Value);
+    }
+
+    private void SelectSeamPan(int panNumber)
+    {
+        _selectedSeamPanNumber = panNumber;
+        UpdateSeamPanel();
+        BuildDormer(resetView: false);
+    }
+
+    private void OpenSelectedSeamCutWindow()
+    {
+        var pan = GetSelectedSeamPan();
+        if (pan is null)
+            return;
+
+        var raw = CalculatePanRawGeometry(pan);
+        var isLeft = _selectedSurfaceKey == "left-cheek";
+        var surfaceName = isLeft
+            ? "Gaubenwange links"
+            : "Gaubenwange rechts";
+
+        var direction = isLeft
+            ? "rechts → links"
+            : "links → rechts";
+
+        var data = new SeamCutData(
+            SurfaceName: surfaceName,
+            PanNumber: pan.Number,
+            IsStartPan: pan.IsStart,
+            RawWidthMm: raw.RawWidthMm,
+            VisibleWidthMm: pan.VisibleEndMm - pan.VisibleStartMm,
+            StartHeightMm: raw.StartHeightMm,
+            EndHeightMm: raw.EndHeightMm,
+            BottomDeltaMm: raw.BottomDeltaMm,
+            TopDeltaMm: raw.TopDeltaMm,
+            StartFoldMm: raw.StartFoldMm,
+            EndFoldMm: raw.EndFoldMm,
+            TopAllowanceMm: Math.Max(ParseMillimeters(TopAllowanceBox?.Text), 0),
+            BottomAllowanceMm: Math.Max(ParseMillimeters(BottomAllowanceBox?.Text), 0),
+            StartFoldName: raw.StartFoldName,
+            EndFoldName: raw.EndFoldName,
+            DeckDirection: direction);
+
+        var window = new SeamCutWindow(data)
+        {
+            Owner = this
+        };
+        window.Show();
+    }
+
+    private int? HitTestSeamPan(Point clickPoint)
+    {
+        if (!_seamToolActive ||
+            _selectedSurfaceKey is not ("left-cheek" or "right-cheek"))
+        {
+            return null;
+        }
+
+        var pans = CalculateCheekSeamPans();
+        if (pans.Count == 0 || _depthMm <= 0)
+            return null;
+
+        var isLeft = _selectedSurfaceKey == "left-cheek";
+        var scale = ComputeScale();
+        var width = _widthMm * scale;
+        var height = _frontWallHeightMm * scale;
+        var depth = _depthMm * scale;
+
+        var x = isLeft ? -width / 2.0 : width / 2.0;
+        var zFront = depth / 2.0;
+        var zBack = -depth / 2.0;
+
+        var frontBottom = new Point3D(x, 0, zFront);
+        var frontTop = new Point3D(x, height, zFront);
+
+        var dormerPitchTan = HasShedRoof
+            ? Math.Tan(DegToRad(_dormerRoofPitchDeg))
+            : 0.0;
+
+        var backY = height + dormerPitchTan * depth;
+        var back = new Point3D(x, backY, zBack);
+
+        foreach (var pan in pans)
+        {
+            var t0 = Math.Clamp(pan.VisibleStartMm / _depthMm, 0, 1);
+            var t1 = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
+
+            var b0 = Lerp(frontBottom, back, t0);
+            var t0p = Lerp(frontTop, back, t0);
+            var b1 = Lerp(frontBottom, back, t1);
+            var t1p = Lerp(frontTop, back, t1);
+
+            var p0 = ProjectToViewport(b0);
+            var p1 = ProjectToViewport(b1);
+            var p2 = ProjectToViewport(t1p);
+            var p3 = ProjectToViewport(t0p);
+
+            if (p0 is null || p1 is null || p2 is null || p3 is null)
+                continue;
+
+            if (PointInPolygon(
+                clickPoint,
+                new[] { p0.Value, p1.Value, p2.Value, p3.Value }))
+            {
+                return pan.Number;
+            }
+        }
+
+        return null;
+    }
+
+    private static Point3D Lerp(Point3D a, Point3D b, double t)
+        => new(
+            a.X + (b.X - a.X) * t,
+            a.Y + (b.Y - a.Y) * t,
+            a.Z + (b.Z - a.Z) * t);
+
+    private static bool PointInPolygon(Point p, IReadOnlyList<Point> polygon)
+    {
+        var inside = false;
+
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            var j = (i + polygon.Count - 1) % polygon.Count;
+            var pi = polygon[i];
+            var pj = polygon[j];
+
+            var intersect =
+                ((pi.Y > p.Y) != (pj.Y > p.Y)) &&
+                (p.X <
+                 (pj.X - pi.X) * (p.Y - pi.Y) /
+                 ((pj.Y - pi.Y) + 0.0000001) + pi.X);
+
+            if (intersect)
+                inside = !inside;
+        }
+
+        return inside;
     }
 
     private void AddSelectedCheekSeamLines(
@@ -652,6 +845,40 @@ public partial class MainWindow : Window
 
             AddPassiveEdge(bottom, top, seamBrush, 0.0055);
         }
+    }
+
+    private void AddSelectedSeamPanHighlight(
+        Point3D frontBottom,
+        Point3D frontTop,
+        Point3D backPoint,
+        bool isLeft)
+    {
+        if (!_seamToolActive || _selectedSeamPanNumber is null)
+            return;
+
+        var pan = GetSelectedSeamPan();
+        if (pan is null || _depthMm <= 0)
+            return;
+
+        var t0 = Math.Clamp(pan.VisibleStartMm / _depthMm, 0, 1);
+        var t1 = Math.Clamp(pan.VisibleEndMm / _depthMm, 0, 1);
+
+        var b0 = Lerp(frontBottom, backPoint, t0);
+        var t0p = Lerp(frontTop, backPoint, t0);
+        var b1 = Lerp(frontBottom, backPoint, t1);
+        var t1p = Lerp(frontTop, backPoint, t1);
+
+        var offset = isLeft ? -0.012 : 0.012;
+
+        b0.X += offset;
+        t0p.X += offset;
+        b1.X += offset;
+        t1p.X += offset;
+
+        var brush = new SolidColorBrush(Color.FromArgb(105, 64, 141, 181));
+        brush.Freeze();
+
+        AddQuadSurface(b0, b1, t1p, t0p, brush);
     }
 
     private bool HasGable => DormerTypeCombo.SelectedIndex == 1;
@@ -1065,10 +1292,24 @@ public partial class MainWindow : Window
         AddTriangleSurface(frontBottomRight, backIntersectionRight, frontTopRight, _dormerSideBrush, "right-cheek");
 
         if (_seamToolActive && _selectedSurfaceKey == "left-cheek")
+        {
             AddSelectedCheekSeamLines(frontBottomLeft, frontTopLeft, backIntersectionLeft);
+            AddSelectedSeamPanHighlight(
+                frontBottomLeft,
+                frontTopLeft,
+                backIntersectionLeft,
+                isLeft: true);
+        }
 
         if (_seamToolActive && _selectedSurfaceKey == "right-cheek")
+        {
             AddSelectedCheekSeamLines(frontBottomRight, frontTopRight, backIntersectionRight);
+            AddSelectedSeamPanHighlight(
+                frontBottomRight,
+                frontTopRight,
+                backIntersectionRight,
+                isLeft: false);
+        }
 
         // Gemeinsame, auswählbare Grundkanten.
         AddEdge(frontBottomLeft, frontBottomRight, WidthKey);
@@ -1250,7 +1491,29 @@ public partial class MainWindow : Window
     {
         if (_isOrbiting && !_leftDragExceededThreshold)
         {
-            var hit = HitTestScene(e.GetPosition(DormerViewport));
+            var clickPoint = e.GetPosition(DormerViewport);
+
+            if (_seamToolActive)
+            {
+                var panNumber = HitTestSeamPan(clickPoint);
+
+                if (panNumber is not null)
+                {
+                    SelectSeamPan(panNumber.Value);
+
+                    if (e.ClickCount >= 2)
+                        OpenSelectedSeamCutWindow();
+
+                    _isOrbiting = false;
+
+                    if (!_isPanning)
+                        ViewportHost.ReleaseMouseCapture();
+
+                    return;
+                }
+            }
+
+            var hit = HitTestScene(clickPoint);
 
             if (hit.DimensionKey is not null)
             {
@@ -1783,6 +2046,9 @@ public partial class MainWindow : Window
 
         if (_seamToolActive)
         {
+            if (surfaceKey is "left-cheek" or "right-cheek")
+                _selectedSeamPanNumber = 1;
+
             UpdateSeamPanel();
             BuildDormer(resetView: false);
         }
