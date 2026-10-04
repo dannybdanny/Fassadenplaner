@@ -57,6 +57,30 @@ public partial class MainWindow : Window
     private bool _updatingCladding;
     private bool _seamToolActive;
     private bool _updatingSeamDistribution;
+
+    private sealed class SeamDistributionSettings
+    {
+        public string Mode { get; set; } = "standard";
+        public double ManualDeckWidthMm { get; set; } = 420.0;
+
+        public SeamDistributionSettings Clone()
+            => new()
+            {
+                Mode = Mode,
+                ManualDeckWidthMm = ManualDeckWidthMm
+            };
+    }
+
+    private readonly Dictionary<string, SeamDistributionSettings>
+        _seamDistributionBySurface = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly string[] SeamSurfaceKeys =
+    {
+        "left-cheek",
+        "right-cheek",
+        "front"
+    };
+
     private int? _selectedSeamPanNumber;
     private int? _lastClickedSeamPanNumber;
     private DateTime _lastSeamPanClickUtc = DateTime.MinValue;
@@ -231,6 +255,7 @@ public partial class MainWindow : Window
         ToolPanelSubtitle.Text = "Deckrichtung, Einteilung und erster Zuschnitt";
 
         InitializeSeamDistributionInput();
+        LoadSeamDistributionSettings(_selectedSurfaceKey);
 
         SeamToolButton.Background =
             new SolidColorBrush(Color.FromRgb(231, 241, 247));
@@ -258,9 +283,20 @@ public partial class MainWindow : Window
             return;
 
         var maxDeck = GetMaximumUniformDeckWidthMm();
+
+        if (_selectedSurfaceKey is "left-cheek" or "right-cheek" or "front")
+        {
+            var settings = GetOrCreateSeamSettings(_selectedSurfaceKey);
+
+            if (settings.ManualDeckWidthMm <= 0 && maxDeck > 0)
+                settings.ManualDeckWidthMm = maxDeck;
+
+            return;
+        }
+
         var current = ParseMillimeters(ManualSeamDeckWidthBox.Text);
 
-        if (maxDeck > 0 && (current <= 0 || current > maxDeck))
+        if (maxDeck > 0 && current <= 0)
         {
             _updatingSeamDistribution = true;
             ManualSeamDeckWidthBox.Text =
@@ -538,8 +574,83 @@ public partial class MainWindow : Window
         return Math.Min(regular, start);
     }
 
+    private bool UseStandardSeamDistribution =>
+        StandardSeamDistributionRadio?.IsChecked == true;
+
     private bool UseEqualSeamDistribution =>
-        EqualSeamDistributionRadio?.IsChecked != false;
+        EqualSeamDistributionRadio?.IsChecked == true;
+
+    private bool UseManualSeamDistribution =>
+        ManualSeamDistributionRadio?.IsChecked == true;
+
+    private SeamDistributionSettings GetOrCreateSeamSettings(string surfaceKey)
+    {
+        if (!_seamDistributionBySurface.TryGetValue(surfaceKey, out var settings))
+        {
+            settings = new SeamDistributionSettings
+            {
+                Mode = "standard",
+                ManualDeckWidthMm = Math.Max(GetMaximumUniformDeckWidthMm(), 1)
+            };
+            _seamDistributionBySurface[surfaceKey] = settings;
+        }
+
+        return settings;
+    }
+
+    private void LoadSeamDistributionSettings(string? surfaceKey)
+    {
+        if (string.IsNullOrWhiteSpace(surfaceKey) ||
+            surfaceKey is not ("left-cheek" or "right-cheek" or "front"))
+        {
+            return;
+        }
+
+        var settings = GetOrCreateSeamSettings(surfaceKey);
+
+        _updatingSeamDistribution = true;
+        try
+        {
+            StandardSeamDistributionRadio.IsChecked =
+                settings.Mode == "standard";
+            EqualSeamDistributionRadio.IsChecked =
+                settings.Mode == "equal";
+            ManualSeamDistributionRadio.IsChecked =
+                settings.Mode == "manual";
+
+            ManualSeamDeckWidthBox.Text =
+                settings.ManualDeckWidthMm.ToString(
+                    "0.#",
+                    CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            _updatingSeamDistribution = false;
+        }
+
+        UpdateSeamDistributionControls();
+    }
+
+    private void SaveCurrentSeamDistributionSettings()
+    {
+        if (_updatingSeamDistribution ||
+            _selectedSurfaceKey is not ("left-cheek" or "right-cheek" or "front"))
+        {
+            return;
+        }
+
+        var settings = GetOrCreateSeamSettings(_selectedSurfaceKey);
+
+        settings.Mode = UseManualSeamDistribution
+            ? "manual"
+            : UseEqualSeamDistribution
+                ? "equal"
+                : "standard";
+
+        var manual = ParseMillimeters(ManualSeamDeckWidthBox?.Text);
+        if (manual > 0)
+            settings.ManualDeckWidthMm = manual;
+    }
 
     private double GetChosenSeamDeckWidthMm()
     {
@@ -557,12 +668,17 @@ public partial class MainWindow : Window
             return _depthMm / count;
         }
 
-        var requested = ParseMillimeters(ManualSeamDeckWidthBox?.Text);
+        if (UseManualSeamDistribution)
+        {
+            var requested = ParseMillimeters(ManualSeamDeckWidthBox?.Text);
 
-        if (requested <= 0)
-            return maxDeck;
+            if (requested <= 0)
+                return maxDeck;
 
-        return Math.Min(requested, maxDeck);
+            return Math.Min(requested, maxDeck);
+        }
+
+        return GetMaximumRegularDeckWidthMm();
     }
 
     private void SeamDistributionMode_Checked(object sender, RoutedEventArgs e)
@@ -570,6 +686,7 @@ public partial class MainWindow : Window
         if (!IsLoaded || _updatingSeamDistribution)
             return;
 
+        SaveCurrentSeamDistributionSettings();
         UpdateSeamDistributionControls();
         UpdateSeamPanel();
         BuildDormer(resetView: false);
@@ -580,12 +697,39 @@ public partial class MainWindow : Window
         if (!IsLoaded || _updatingSeamDistribution)
             return;
 
-        if (ManualSeamDistributionRadio?.IsChecked == true)
+        if (UseManualSeamDistribution)
         {
+            SaveCurrentSeamDistributionSettings();
             UpdateSeamDistributionControls();
             UpdateSeamPanel();
             BuildDormer(resetView: false);
         }
+    }
+
+    private void ApplySeamDistributionToAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSurfaceKey is not ("left-cheek" or "right-cheek" or "front"))
+        {
+            MessageBox.Show(
+                "Bitte zuerst eine Fläche auswählen.",
+                "Scharen",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        SaveCurrentSeamDistributionSettings();
+
+        var source = GetOrCreateSeamSettings(_selectedSurfaceKey).Clone();
+
+        foreach (var key in SeamSurfaceKeys)
+        {
+            _seamDistributionBySurface[key] = source.Clone();
+        }
+
+        UpdateSeamDistributionControls();
+        UpdateSeamPanel();
+        BuildDormer(resetView: false);
     }
 
     private void UpdateSeamDistributionControls()
@@ -597,14 +741,31 @@ public partial class MainWindow : Window
             return;
         }
 
-        var manual = ManualSeamDistributionRadio?.IsChecked == true;
         ManualSeamDeckWidthPanel.Visibility =
-            manual ? Visibility.Visible : Visibility.Collapsed;
+            UseManualSeamDistribution
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
-        var maxDeck = GetMaximumUniformDeckWidthMm();
+        var maxUniform = GetMaximumUniformDeckWidthMm();
+        var standardStart = GetMaximumStartDeckWidthMm();
+        var standardRegular = GetMaximumRegularDeckWidthMm();
+
+        if (UseStandardSeamDistribution)
+        {
+            SeamDistributionHintText.Text =
+                standardStart > 0 && standardRegular > 0
+                    ? $"Startschar {standardStart:0.#} mm · danach {standardRegular:0.#} mm"
+                    : "Noch keine gültigen Standardmaße";
+
+            SeamDistributionHintText.Foreground =
+                new SolidColorBrush(Color.FromRgb(125, 137, 146));
+            SeamDistributionDeckWidthText.Text = "Standard";
+            return;
+        }
+
         var chosen = GetChosenSeamDeckWidthMm();
 
-        if (maxDeck <= 0 || chosen <= 0)
+        if (maxUniform <= 0 || chosen <= 0)
         {
             SeamDistributionDeckWidthText.Text = "–";
             SeamDistributionHintText.Text = "Noch keine gültige Deckbreite";
@@ -613,10 +774,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!manual)
+        if (UseEqualSeamDistribution)
         {
             SeamDistributionHintText.Text =
-                $"Gleichmäßig · max. {maxDeck:0.#} mm möglich";
+                $"Gleichmäßig · max. {maxUniform:0.#} mm möglich";
             SeamDistributionHintText.Foreground =
                 new SolidColorBrush(Color.FromRgb(125, 137, 146));
             SeamDistributionDeckWidthText.Text =
@@ -626,19 +787,19 @@ public partial class MainWindow : Window
 
         var requested = ParseMillimeters(ManualSeamDeckWidthBox?.Text);
 
-        if (requested > maxDeck + 0.01)
+        if (requested > maxUniform + 0.01)
         {
             SeamDistributionHintText.Text =
-                $"Maximal {maxDeck:0.#} mm mit diesem Coil";
+                $"Maximal {maxUniform:0.#} mm mit diesem Coil";
             SeamDistributionHintText.Foreground =
                 new SolidColorBrush(Color.FromRgb(173, 66, 66));
             SeamDistributionDeckWidthText.Text =
-                $"{maxDeck:0.#} mm";
+                $"{maxUniform:0.#} mm";
         }
         else
         {
             SeamDistributionHintText.Text =
-                $"Manuell · max. {maxDeck:0.#} mm möglich";
+                $"Manuell · max. {maxUniform:0.#} mm möglich";
             SeamDistributionHintText.Foreground =
                 new SolidColorBrush(Color.FromRgb(125, 137, 146));
             SeamDistributionDeckWidthText.Text =
@@ -650,9 +811,37 @@ public partial class MainWindow : Window
     {
         var result = new List<SeamPan>();
         var length = _depthMm;
+
+        if (length <= 0)
+            return result;
+
+        if (UseStandardSeamDistribution)
+        {
+            var startWidth = GetMaximumStartDeckWidthMm();
+            var regularWidth = GetMaximumRegularDeckWidthMm();
+
+            if (startWidth <= 0 || regularWidth <= 0)
+                return result;
+
+            var firstEnd = Math.Min(startWidth, length);
+            result.Add(new SeamPan(1, 0, firstEnd, true));
+
+            var cursor = firstEnd;
+            var number = 2;
+
+            while (cursor < length - 0.01)
+            {
+                var next = Math.Min(cursor + regularWidth, length);
+                result.Add(new SeamPan(number++, cursor, next, false));
+                cursor = next;
+            }
+
+            return result;
+        }
+
         var deckWidth = GetChosenSeamDeckWidthMm();
 
-        if (length <= 0 || deckWidth <= 0)
+        if (deckWidth <= 0)
             return result;
 
         if (UseEqualSeamDistribution)
@@ -681,22 +870,22 @@ public partial class MainWindow : Window
             return result;
         }
 
-        var cursor = 0.0;
-        var number = 1;
+        var cursorManual = 0.0;
+        var manualNumber = 1;
 
-        while (cursor < length - 0.01)
+        while (cursorManual < length - 0.01)
         {
-            var next = Math.Min(cursor + deckWidth, length);
+            var next = Math.Min(cursorManual + deckWidth, length);
 
             result.Add(
                 new SeamPan(
-                    number,
-                    cursor,
+                    manualNumber,
+                    cursorManual,
                     next,
-                    number == 1));
+                    manualNumber == 1));
 
-            cursor = next;
-            number++;
+            cursorManual = next;
+            manualNumber++;
         }
 
         return result;
@@ -733,12 +922,18 @@ public partial class MainWindow : Window
 
         UpdateSeamDistributionControls();
 
-        var chosenWidth = GetChosenSeamDeckWidthMm();
+        var startWidth = UseStandardSeamDistribution
+            ? GetMaximumStartDeckWidthMm()
+            : GetChosenSeamDeckWidthMm();
+
+        var regularWidth = UseStandardSeamDistribution
+            ? GetMaximumRegularDeckWidthMm()
+            : GetChosenSeamDeckWidthMm();
 
         StartPanWidthText.Text =
-            chosenWidth > 0 ? $"{chosenWidth:0.#} mm" : "–";
+            startWidth > 0 ? $"{startWidth:0.#} mm" : "–";
         RegularPanWidthText.Text =
-            chosenWidth > 0 ? $"{chosenWidth:0.#} mm" : "–";
+            regularWidth > 0 ? $"{regularWidth:0.#} mm" : "–";
         var pans = CalculateCheekSeamPans();
         PanCountText.Text =
             pans.Count > 0 ? pans.Count.ToString(CultureInfo.InvariantCulture) : "–";
@@ -2267,9 +2462,13 @@ public partial class MainWindow : Window
 
         if (_seamToolActive)
         {
-            if (surfaceKey is "left-cheek" or "right-cheek")
+            if (surfaceKey is "left-cheek" or "right-cheek" or "front")
             {
-                _selectedSeamPanNumber = 1;
+                LoadSeamDistributionSettings(surfaceKey);
+
+                if (surfaceKey is "left-cheek" or "right-cheek")
+                    _selectedSeamPanNumber = 1;
+
                 _lastClickedSeamPanNumber = null;
                 _lastSeamPanClickUtc = DateTime.MinValue;
             }
