@@ -472,8 +472,6 @@ public sealed class SeamCutWindow : Window
         var topDimensionY =
             Math.Max(profileY + 92, Math.Min(leftTop, rightTop) - 22);
 
-        // "oben +..." sitzt direkt über der Maßkette.
-        var topAllowanceLegendY = topDimensionY - 28;
 
         DrawDimensionSegment(
             x0,
@@ -511,17 +509,58 @@ public sealed class SeamCutWindow : Window
             rightTop,
             FormatLength(rightHeightMm));
 
-        AddLegend(
-            $"oben +{FormatLength(_data.TopAllowanceMm)}",
-            (x0 + x1) / 2,
-            topAllowanceLegendY,
-            HorizontalAlignment.Center);
+        DrawBottomAngle(
+            pBottomLeft,
+            pBottomRight);
+    }
 
-        AddLegend(
-            $"unten +{FormatLength(_data.BottomAllowanceMm)}",
-            (x0 + x1) / 2,
-            Math.Min(height - 50, Math.Max(leftBottom, rightBottom) + 10),
-            HorizontalAlignment.Center);
+    private void DrawBottomAngle(
+        Point left,
+        Point right)
+    {
+        var dxPx = right.X - left.X;
+        var dyPx = right.Y - left.Y;
+
+        if (Math.Abs(dxPx) < 0.001)
+            return;
+
+        // Der Winkel wird gegen die Waagerechte angegeben.
+        // Pixel-Skalierung ist in X/Y identisch, daher entspricht die
+        // Bildschirmgeometrie dem realen Winkel der Zuschnittkante.
+        var angleDeg =
+            Math.Atan2(Math.Abs(dyPx), Math.Abs(dxPx)) *
+            180.0 / Math.PI;
+
+        var mid = new Point(
+            (left.X + right.X) / 2.0,
+            (left.Y + right.Y) / 2.0);
+
+        var label = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)),
+            Padding = new Thickness(4, 1, 4, 1),
+            Child = new TextBlock
+            {
+                Text = $"{angleDeg.ToString("0.#", GermanCulture)}°",
+                FontSize = 9.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(49, 86, 107))
+            }
+        };
+
+        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        // Etwas oberhalb der schrägen Unterkante, damit die Beschriftung
+        // die Linie nicht überdeckt.
+        Canvas.SetLeft(
+            label,
+            mid.X - label.DesiredSize.Width / 2.0);
+
+        Canvas.SetTop(
+            label,
+            mid.Y - label.DesiredSize.Height - 7);
+
+        _drawingCanvas.Children.Add(label);
     }
 
     private void DrawProfileView(
