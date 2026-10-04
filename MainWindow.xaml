@@ -1051,9 +1051,26 @@
                                                FontWeight="SemiBold"
                                                Foreground="#53636F"/>
 
-                                    <RadioButton x:Name="EqualSeamDistributionRadio"
+                                    <RadioButton x:Name="StandardSeamDistributionRadio"
                                                  GroupName="SeamDistribution"
                                                  IsChecked="True"
+                                                 Margin="0,7,0,0"
+                                                 Checked="SeamDistributionMode_Checked">
+                                        <StackPanel>
+                                            <TextBlock Text="Standard-Deckbreite"
+                                                       FontSize="10.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#334753"/>
+                                            <TextBlock Text="Startschar und Folgescharen mit den hinterlegten Deckmaßen"
+                                                       Margin="0,1,0,0"
+                                                       FontSize="9"
+                                                       Foreground="#87939C"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <RadioButton x:Name="EqualSeamDistributionRadio"
+                                                 GroupName="SeamDistribution"
                                                  Margin="0,7,0,0"
                                                  Checked="SeamDistributionMode_Checked">
                                         <StackPanel>
@@ -1120,6 +1137,17 @@
                                                    FontWeight="SemiBold"
                                                    Foreground="#31566B"/>
                                     </Grid>
+
+                                    <Button x:Name="ApplySeamDistributionToAllButton"
+                                            Content="Für alle Flächen übernehmen"
+                                            Height="30"
+                                            Margin="20,9,0,0"
+                                            Padding="10,0"
+                                            Background="#EEF3F6"
+                                            Foreground="#31566B"
+                                            BorderBrush="#D5E1E7"
+                                            BorderThickness="1"
+                                            Click="ApplySeamDistributionToAll_Click"/>
                                 </StackPanel>
                             </Border>
 
